@@ -2,6 +2,10 @@
 
 #### By David Clark
 
+# Utilities Class Library
+
+The Utilities Class Library encapsulates various classes and methods that I developed since Development Portfolio 1 to simplify various repetitive coding tasks such as interacting with the user via console menus or prompting the user for and validating input against for appropriate type and meeting constraints.
+
 # Week 1
 
 ## Exercise 1
