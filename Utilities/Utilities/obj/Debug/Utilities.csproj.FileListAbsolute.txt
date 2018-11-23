@@ -1,0 +1,6 @@
+C:\Users\David Clark\source\repos\Utilities\Utilities\bin\Debug\Utilities.dll
+C:\Users\David Clark\source\repos\Utilities\Utilities\bin\Debug\Utilities.pdb
+C:\Users\David Clark\source\repos\Utilities\Utilities\obj\Debug\Utilities.csprojAssemblyReference.cache
+C:\Users\David Clark\source\repos\Utilities\Utilities\obj\Debug\Utilities.csproj.CoreCompileInputs.cache
+C:\Users\David Clark\source\repos\Utilities\Utilities\obj\Debug\Utilities.dll
+C:\Users\David Clark\source\repos\Utilities\Utilities\obj\Debug\Utilities.pdb
