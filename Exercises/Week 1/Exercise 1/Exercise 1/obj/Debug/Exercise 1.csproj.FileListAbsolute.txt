@@ -1,0 +1,10 @@
+\\vmware-host\Shared Folders\Desktop\dvp2\Exercises\Week 1\Exercise 1\Exercise 1\obj\Debug\Exercise 1.csprojAssemblyReference.cache
+\\vmware-host\Shared Folders\Desktop\dvp2\Exercises\Week 1\Exercise 1\Exercise 1\obj\Debug\Exercise 1.csproj.CoreCompileInputs.cache
+\\vmware-host\Shared Folders\Desktop\dvp2\Exercises\Week 1\Exercise 1\Exercise 1\bin\Debug\Exercise 1.exe.config
+\\vmware-host\Shared Folders\Desktop\dvp2\Exercises\Week 1\Exercise 1\Exercise 1\bin\Debug\Exercise 1.exe
+\\vmware-host\Shared Folders\Desktop\dvp2\Exercises\Week 1\Exercise 1\Exercise 1\bin\Debug\Exercise 1.pdb
+\\vmware-host\Shared Folders\Desktop\dvp2\Exercises\Week 1\Exercise 1\Exercise 1\bin\Debug\Utilities.dll
+\\vmware-host\Shared Folders\Desktop\dvp2\Exercises\Week 1\Exercise 1\Exercise 1\bin\Debug\Utilities.pdb
+\\vmware-host\Shared Folders\Desktop\dvp2\Exercises\Week 1\Exercise 1\Exercise 1\obj\Debug\Exercise 1.csproj.CopyComplete
+\\vmware-host\Shared Folders\Desktop\dvp2\Exercises\Week 1\Exercise 1\Exercise 1\obj\Debug\Exercise 1.exe
+\\vmware-host\Shared Folders\Desktop\dvp2\Exercises\Week 1\Exercise 1\Exercise 1\obj\Debug\Exercise 1.pdb
