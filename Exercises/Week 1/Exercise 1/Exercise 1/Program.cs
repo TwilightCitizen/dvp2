@@ -1,8 +1,18 @@
-﻿using System;
+﻿/* Name:        David A. Clark, Jr.
+ * Class:       MDV2229-O
+ * Assignment:  1.4 - Coding Exercise - Exercise 1
+ * Date:        2018-11-24
+ * 
+ * Tasks:       Present the user with a menu-driven console application to perform
+ *              various operations on an unsorted list of 20 Topic Matters.
+ *              
+ * Note:        Uses SuperMenu, and various MenuOption subclasses from referenced
+ *              Utilities class library.
+ */
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Utilities.Terminal;
 
 namespace Exercise_1
@@ -50,7 +60,7 @@ namespace Exercise_1
                                 , RemoveRandomTopicMatter )
 
             // Because you said to have fun with it, let's add a few
-            // more options.  How about an un-sort to go with undo?
+            // more options.
 
         ,   new ActionOnlyOption( "Shuffle the Topic Matters"
                                 , ShuffleTopicMatters )
@@ -65,7 +75,14 @@ namespace Exercise_1
                                 , Undo
                                 , conditions : new List< Func< bool > >()
                                                {
-                                                   () => undoStack.Count > 0
+                                                   () => undoStack.Any()
+                                               } )
+
+        ,   new ActionOnlyOption( "Redo the Last undone Action"
+                                , Redo
+                                , conditions : new List< Func< bool > >()
+                                               {
+                                                   () => redoStack.Any()
                                                } )
 
             // This one just encapsulates Environment.Exit(), otherwise,
@@ -79,6 +96,9 @@ namespace Exercise_1
         // so the user can't undo something that wasn't done and pop an empty stack.
         private static Stack< List< string > > undoStack = new Stack< List< string > >();
 
+        // This is basically for the same purposes of undo, to undo an undo.
+        private static Stack< List< string > > redoStack = new Stack< List< string > >();
+
         // Write all the Topic Matters to the console.
         private static void ShowTopicMatters() =>
             // Write all the Topic Matters to the console.  A
@@ -86,45 +106,119 @@ namespace Exercise_1
             topicMatters.ForEach( tm => Console.WriteLine( tm ) );
 
         // Sort all the Topic Matters in alphabetical order, first pushing them
-        // to the Undo stack so it can be undone later.
+        // to the Undo stack so it can be undone later, clearing the Redo stack.
         private static void SortTopicMatters()
         {
-            undoStack.Push( topicMatters );
+            PrepUndoRedo();
+
             // List.Sort() defaults to ascending alphabetic sorting.
             topicMatters.Sort();
+
+            // Let the user know the sort is done.
+            Console.WriteLine( "\nThe Topic Matters have been sorted in alphabetical order." );
         }
 
         // Sort all the Topic Matter in reverse alphabetical order, first pushing
-        // them to the Undo stack for undo later.
+        // them to the Undo stack for undo later, clearing the Redo stack.
         private static void ReverseTopicMatters()
         {
-            undoStack.Push( topicMatters );
+           PrepUndoRedo();
+
             // We can't just reverse the Topic Matters assuming the user first
             // sorted them, so just do a proper reverse-alphabetical sort.
             topicMatters.Sort();
             topicMatters.Reverse();
+
+            // Let the user know the reverse sort is done.
+            Console.WriteLine( "\nThe Topic Matters have been sorted in reverse alphabetical order." );
         }
 
         // Removes a random Topic Matter using a LOOP.  Really, this sounds
-        // like a job for a bounded pseudo-random number, but can can capture
+        // like a job for a bounded pseudo-random number, but we can capture
         // the seconds on the clock, loop through the list that many times,
-        // and just delete the Topic Mater we land on.  Also, we make sure to
-        // prepare for an Undo.
+        // modulo the length of the list, and just delete the Topic Mater we
+        // land on.  Also, we make sure to prepare for an Undo and Redo.
         private static void RemoveRandomTopicMatter()
         {
-            undoStack.Push( topicMatters );
+            PrepUndoRedo();
 
+            // For capturing the topic matter we stop at outside
+            // of the loop's scope.
+            string topicMatter = null;
 
+            // Loop through the topicMatters, as many times as seconds are
+            // in the current time, modulo length of the list.
+            for( int i = 0; i < DateTime.Now.Second % topicMatters.Count; i++ )
+                topicMatter = topicMatters[ i ];
+
+            // Delete the last capured topic matter.
+            topicMatters.Remove( topicMatter );
+
+            // Let the user know the random delete is done.
+            Console.WriteLine( "\nA random Topic Matter has been deleted." );
         }
 
+        // Partition the topic matters into two approximately equal halves,
+        // and recombine them into shuffled list by taking one off each half
+        // at a time, of course first preparing for an Undo and Redo.
+        // Not the most efficient shuffle in the world, but at the very
+        // least, it's intuitive to follow.
         private static void ShuffleTopicMatters()
         {
+            PrepUndoRedo();
 
+            // Split the Topic Matters into two approximate halves.
+            var leftHalf  = new Stack< string >( topicMatters.Take( topicMatters.Count / 2 ) );
+            var rightHalf = new Stack< string >( topicMatters.Skip( topicMatters.Count / 2 ) );
+
+            // Don't want to shuffle the Topic Matters into existing ones...
+            topicMatters = new List< string >();
+
+            // Insert one off each half into Topic Matters, alternating
+            // until they're all gone.
+            while( leftHalf.Any() && rightHalf.Any() )
+            {
+                topicMatters.Add( rightHalf.Pop() );
+                topicMatters.Add( leftHalf.Pop()  );
+            }
+
+            // The right half could have a Topic Matter left over in the case
+            // of an odd number of Topic Matters.
+            if( rightHalf.Any() ) topicMatters.Add( rightHalf.Pop() );
+
+            // Let the user know the shuffle is done.
+            Console.WriteLine( "\nThe Topic Matters have been shuffled." );
         }
 
+        // Push a copy of the Topic Matters onto the Undo stack and clear
+        // the Redo stack.  A copy is necessary since lists are ref types.
+        private static void PrepUndoRedo()
+        {
+            undoStack.Push( new List< string >( topicMatters ) );
+            redoStack.Clear();
+        }
+
+        // Undo just pops the last pushed Topic Matters list from the undo
+        // stack into the Topic Matters.  To support redoing the undone
+        // action, it pushes the current Topic Matters to the redoStack.
         private static void Undo()
         {
+            redoStack.Push( new List< string >( topicMatters ) );
+            topicMatters = undoStack.Pop();
 
+            // Let the user know the last action is undone.
+            Console.WriteLine( "\nThe Topic Matters have been restored to their previous state." );
+        }
+
+        // Undo the undo.  This can only be done if something hasn't been done
+        // after an undo. 
+        private static void Redo()
+        {
+            undoStack.Push( new List< string >( topicMatters ) );
+            topicMatters = redoStack.Pop();
+
+            // Let the user know the last undone action is redone.
+            Console.WriteLine( "\nThe Topic Matters have been restored to their previous undone state." );
         }
 
         // Program entry point.
