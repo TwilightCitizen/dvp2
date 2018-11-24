@@ -128,16 +128,16 @@ namespace Utilities.Terminal
 
         private string UniqueLetter( MenuOption menuOption)
         {
-            var existingLetters = this.Where( opt => opt.Letter != null)
-                                      .Select( opt => opt.Letter.ToUpper() ).ToList();
-            var lettersInOption = new string( menuOption.Text.Where( char.IsLetter ).ToArray() ).ToUpper();
+            var existingLetters  = this.Where( opt => opt.Letter != null)
+                                       .Select( opt => opt.Letter.ToUpper() ).ToList();
+            var lettersInOption  = menuOption.Text;
 
-            var chunksInOption  =
+            var chunksInOption   =
                 from i in Enumerable.Range( 0, lettersInOption.Length )
                 from j in Enumerable.Range( 0, lettersInOption.Length - i + 1 )
-                where j >= 1
+                where j >= 1 && lettersInOption.Substring( i, j ).All( char.IsLetter )
                 orderby lettersInOption.Substring( i, j ).Length
-                select lettersInOption.Substring( i, j );
+                select lettersInOption.Substring( i, j ).ToUpper();
 
             return chunksInOption.Except( existingLetters )?.FirstOrDefault() ?? null;
         }
