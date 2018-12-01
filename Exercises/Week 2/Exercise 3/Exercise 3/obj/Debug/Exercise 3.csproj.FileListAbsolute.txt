@@ -1,0 +1,12 @@
+\\vmware-host\Shared Folders\Desktop\dvp2\Exercises\Week 2\Exercise 3\Exercise 3\bin\Debug\Exercise 3.exe.config
+\\vmware-host\Shared Folders\Desktop\dvp2\Exercises\Week 2\Exercise 3\Exercise 3\bin\Debug\Exercise 3.exe
+\\vmware-host\Shared Folders\Desktop\dvp2\Exercises\Week 2\Exercise 3\Exercise 3\bin\Debug\Exercise 3.pdb
+\\vmware-host\Shared Folders\Desktop\dvp2\Exercises\Week 2\Exercise 3\Exercise 3\bin\Debug\System.ValueTuple.dll
+\\vmware-host\Shared Folders\Desktop\dvp2\Exercises\Week 2\Exercise 3\Exercise 3\bin\Debug\Utilities.dll
+\\vmware-host\Shared Folders\Desktop\dvp2\Exercises\Week 2\Exercise 3\Exercise 3\bin\Debug\System.ValueTuple.xml
+\\vmware-host\Shared Folders\Desktop\dvp2\Exercises\Week 2\Exercise 3\Exercise 3\bin\Debug\Utilities.pdb
+\\vmware-host\Shared Folders\Desktop\dvp2\Exercises\Week 2\Exercise 3\Exercise 3\obj\Debug\Exercise 3.csprojAssemblyReference.cache
+\\vmware-host\Shared Folders\Desktop\dvp2\Exercises\Week 2\Exercise 3\Exercise 3\obj\Debug\Exercise 3.csproj.CoreCompileInputs.cache
+\\vmware-host\Shared Folders\Desktop\dvp2\Exercises\Week 2\Exercise 3\Exercise 3\obj\Debug\Exercise 3.csproj.CopyComplete
+\\vmware-host\Shared Folders\Desktop\dvp2\Exercises\Week 2\Exercise 3\Exercise 3\obj\Debug\Exercise 3.exe
+\\vmware-host\Shared Folders\Desktop\dvp2\Exercises\Week 2\Exercise 3\Exercise 3\obj\Debug\Exercise 3.pdb
