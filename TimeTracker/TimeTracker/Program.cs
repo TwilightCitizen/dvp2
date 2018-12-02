@@ -13,7 +13,7 @@
  *              from referenced Utilities class library, and MySQL libraries.
  */
 
- using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -45,28 +45,7 @@ namespace TimeTracker
         private static Dictionary< int,      int > days       = new Dictionary< int,      int >();
 
         // Options for Main Menu.
-
-        private static MenuOption optLogin     = new ActionOnlyOption
-        ( 
-            "Login to Your Account"
-        ,   Login
-        ,   conditions : new List< Func< bool > >()
-            {
-                () => loggedIn == null
-            }
-        );
-
-        private static MenuOption optLogout    = new ActionOnlyOption
-        ( 
-            "Logout of Your Account"
-        ,   Logout
-        ,   conditions : new List< Func< bool >>()
-            {
-                () => loggedIn != null
-            }
-        );
-
-        private static MenuOption optRegister  = new ActionOnlyOption
+        private static MenuOption optRegister   = new ActionOnlyOption
         (
             "Register a New Account"
         ,   Register
@@ -76,61 +55,137 @@ namespace TimeTracker
             }
         );
 
-        private static MenuOption optProfile   = new ActionOnlyOption
-        (
-            "View or Edit Your Profile"
-        ,   Profile
+        private static MenuOption optLogin      = new ActionOnlyOption
+        ( 
+            "Login to Your Account"
+        ,   Login
+        ,   conditions : new List< Func< bool > >()
+            {
+                () => loggedIn == null
+            }
+        );
+
+        private static MenuOption optLogout     = new ActionOnlyOption
+        ( 
+            "Logout of Your Account"
+        ,   Logout
         ,   conditions : new List< Func< bool >>()
             {
                 () => loggedIn != null
             }
         );
 
-        private static MenuOption optExit      = new ExitOption();
+        private static MenuOption optProfile    = new ActionOnlyOption
+        (
+            "View or Edit Your Profile"
+        ,   Profile
+        ,   conditions : new List< Func< bool > >()
+            {
+                () => loggedIn != null
+            }
+        );
+
+        private static MenuOption optLookups    = new ActionOnlyOption
+        (
+            "View or Edit Lookup Tables"
+        ,   Lookups
+        ,   conditions : new List< Func< bool > >()
+            {
+                () => loggedIn != null
+            }
+        );
+
+        private static MenuOption optExit       = new ExitOption();
 
         // Main Menu.
-        private static SuperMenu menuMain      = new SuperMenu()
+        private static SuperMenu menuMain       = new SuperMenu()
         {
-            optLogin
+            optRegister
+        ,   optLogin
         ,   optLogout
         ,   optProfile
-        ,   optRegister
+        ,   optLookups
         ,   optExit
         };
 
         // Options for Profile Menu.
         
-        private static MenuOption optFirstName = new ActionOnlyOption
+        private static MenuOption optFirstName  = new ActionOnlyOption
         (
             "Change Your First Name"
         ,   ChangeFirstName
         );
 
-        private static MenuOption optLastName  = new ActionOnlyOption
+        private static MenuOption optLastName   = new ActionOnlyOption
         (
             "Change Your Last Name"
         ,   ChangeLastName
         );
 
-        private static MenuOption optPassword  = new ActionOnlyOption
+        private static MenuOption optPassword   = new ActionOnlyOption
         (
             "Change Your Password"
         ,   ChangePassword
         );
 
-        private static MenuOption optReturn    = new CancelOption
+        private static MenuOption optReturn     = new CancelOption
         (
             "Return to the Main Menu."
         );
 
         // Profile Menu.
-        private static SuperMenu menuProfile   = new SuperMenu()
+        private static SuperMenu menuProfile    = new SuperMenu()
         {
             optFirstName
         ,   optLastName
         ,   optPassword
         ,   optReturn
         };
+
+        // Options for Lookup Menu.
+
+        private static MenuOption optCategories = new ActionOnlyOption
+        (
+            "Categories"
+        ,   Categories
+        );
+
+        private static MenuOption optActivities = new ActionOnlyOption
+        (
+            "Activities"
+        ,   Activities
+        );
+
+        // Lookup Menu.
+        private static SuperMenu menuLookups    = new SuperMenu
+        (
+            "Which Lookup Table would you like to View or Edit?"
+        )
+        {
+            optCategories
+        ,   optActivities
+        ,   optReturn
+        };
+
+        // Option for Lookup View Edit Submenus
+
+        private static MenuOption optAddNew;
+        private static MenuOption optGoBack = new CancelOption
+        (
+            "Return to the previous screen."
+        );
+
+        // Submenus for Lookup View or Edit.
+
+        private static SuperMenu menuCategories = new SuperMenu
+        (
+            "Which Category would you like to View or Edit?"
+        );
+
+        private static SuperMenu menuActivities = new SuperMenu
+        (
+            "Which Activity would you like to View or Edit?"
+        );
 
         // Prompt the user for the User ID and Password to attempt
         // logging in.  Note that Login presently sends Pasword in
@@ -366,8 +421,8 @@ namespace TimeTracker
 
             // Get the user's new First Name, updating the Logged In User.
             loggedIn.FirstName = PromptFor< string >( "Enter your new First Name."
-                                                    , "Your new First Name cannot be blank.  Try again."
-                                                    , any => !string.IsNullOrEmpty( any ) );
+                                                    , "Your new First Name cannot be blank or more than 25 characters.  Try again."
+                                                    , any => !string.IsNullOrEmpty( any ) && any.Length <= 25 );
 
             // Clear the console for nicer output.
             Console.Clear();
@@ -405,8 +460,8 @@ namespace TimeTracker
 
             // Get the user's new Last Name, updating the Logged In User.
             loggedIn.LastName = PromptFor< string >( "Enter your new Last Name."
-                                                   , "Your new Last Name cannot be blank.  Try again."
-                                                   , any => !string.IsNullOrEmpty( any ) );
+                                                   , "Your new Last Name cannot be blank or more than 25 characters.  Try again."
+                                                   , any => !string.IsNullOrEmpty( any ) && any.Length <= 25 );
 
             // Clear the console for nicer output.
             Console.Clear();
@@ -444,8 +499,8 @@ namespace TimeTracker
 
             // Get the user's new Password, updating the Logged In User.
             loggedIn.Password = PromptFor< string >( "Enter your new Password."
-                                                   , "Your new Password cannot be blank.  Try again."
-                                                   , any => !string.IsNullOrEmpty( any ) );
+                                                   , "Your new Password cannot be blank or more than 10 characters.  Try again."
+                                                   , any => !string.IsNullOrEmpty( any ) && any.Length <= 10 );
 
             // Clear the console for nicer output.
             Console.Clear();
@@ -620,6 +675,203 @@ namespace TimeTracker
                     }
                 }
             }
+        }
+
+        // Shows the Lookup View or Edit menu until the
+        // user chooses to go back.
+        private static void Lookups()
+        {
+            // For checking when the user exits.
+            string choice = null;
+
+            // Wait until the user wants to return to the Main Menu.
+            while( choice != optReturn.Text )
+            {
+                // Clear the console for nicer ouput.
+                Console.Clear();
+
+                // Display the Lookups Edit Menu.
+                choice = menuLookups.Run();
+                Pause();
+            }
+        }
+
+        // Clear out the Categories Menu and load it fresh
+        // with the Categories to Edit, including options to add a 
+        // new Category or Cancel. Then run it.
+        private static void Categories()
+        {
+            // For checking when the user exits.
+            string choice = null;
+
+            // Wait until the user wants to go back.
+            while( choice != optGoBack.Text )
+            {
+                // Clear the console for nicer ouput.
+                Console.Clear();
+
+                // Clear the menu.
+                menuCategories.Clear();
+
+                // Insert all the Categories as menu options
+                // to Edit that Category.
+                categories.Keys.ToList().ForEach( key =>
+                    menuCategories.Add( new ActionOnlyOption( 
+                        key, () => EditCategory( key ) ) )
+                );
+
+                // Option to add new Category.
+                optAddNew = new ActionOnlyOption( "Add New", AddCategory );
+                menuCategories.Add( optAddNew  );
+
+                // And, an option to Go Back.
+                menuCategories.Add( optGoBack );
+
+                // Display the Categories Edit Menu.
+                choice = menuCategories.Run();
+                Pause();
+            }
+        }
+
+        // Update the user-selected Category with the new
+        // Category Name provided by the user.
+        private static void EditCategory( string category )
+        {
+            // Clear the Console for cleaner output.
+            Console.Clear();
+
+            // Get the ID for the Category and remove it
+            // from the dictionary.
+            int id = categories[ category ];
+            categories.Remove( category );
+
+            // Get the new Category Name from the user.
+            string newCat = PromptFor< string >( $"What new name would you like for the category \"{category}\"?"
+                                               , "The category name cannot be blank or more than 10 characters.  Try again."
+                                               , cat => !string.IsNullOrEmpty( cat ) && cat.Length <= 10 );
+
+            // Add it as the key for the ID to the dictionary.
+            categories[ newCat ] = id;
+
+            // Update the database accordingly.
+            using( var con = new MySqlConnection( cs ) )
+            {
+                con.Open();
+
+                using( var cmd = con.CreateCommand() )
+                {
+                    cmd.CommandText = "update activity_categories "
+                                    + "set category_description = @CD "
+                                    + "where activity_category_id = @ID";
+
+                    // Protect against SQL Injection Attacks.
+                    cmd.Parameters.AddWithValue( "@CD", newCat );
+                    cmd.Parameters.AddWithValue( "@ID", id );
+
+                    // We don't need rows back from this one, but this could
+                    // fail if the user tries to rename to an existing Category.
+                    if( cmd.ExecuteNonQuery() == 1 )
+                        // Let the user know the change succeeded.
+                        Console.WriteLine( $"Congratulations, {loggedIn.FirstName}...  \"{category}\" is now \"{newCat}\"!" );
+                    else
+                        // Let the user know the change failed.
+                        Console.WriteLine( $"Sorry... It looks like category \"{category}\" already exists!" );
+                }
+            }
+        }
+
+        private static void AddCategory()
+        {
+
+        }
+
+        // Clear out the Activities Menu and load it fresh
+        // with the Activities to Edit, including options to add a 
+        // new Activity or Cancel.  Then run it.
+        private static void Activities()
+        {
+            // For checking when the user exits.
+            string choice = null;
+
+            // Wait until the user wants to go back.
+            while( choice != optGoBack.Text )
+            {
+                // Clear the console for nicer ouput.
+                Console.Clear();
+
+                // Clear the menu.
+                menuActivities.Clear();
+
+                // Insert all the Categories as menu options
+                // to Edit that Category.
+                activities.Keys.ToList().ForEach( key =>
+                    menuActivities.Add( new ActionOnlyOption( 
+                        key, () => EditActivity( key ) ) )
+                );
+
+                // Option to add new Category.
+                optAddNew = new ActionOnlyOption( "Add New", AddActivity );
+                menuActivities.Add( optAddNew  );
+
+                // And, an option to Go Back.
+                menuActivities.Add( optGoBack );
+
+                // Display the Categories Edit Menu.
+                choice = menuActivities.Run();
+                Pause();
+            }
+        }
+
+        // Update the user-selected Category with the new
+        // Category Name provided by the user.
+        private static void EditActivity( string activity )
+        {
+            // Clear the Console for cleaner output.
+            Console.Clear();
+
+            // Get the ID for the Category and remove it
+            // from the dictionary.
+            int id = activities[ activity ];
+            activities.Remove( activity );
+
+            // Get the new Category Name from the user.
+            string newAct = PromptFor< string >( $"What new name would you like for the activity \"{activity}\"?"
+                                               , "The activity name cannot be blank or more than 25 characters.  Try again."
+                                               , act => !string.IsNullOrEmpty( act ) && act.Length <= 25 );
+
+            // Add it as the key for the ID to the dictionary.
+            activities[ newAct ] = id;
+
+            // Update the database accordingly.
+            using( var con = new MySqlConnection( cs ) )
+            {
+                con.Open();
+
+                using( var cmd = con.CreateCommand() )
+                {
+                    cmd.CommandText = "update activity_descriptions "
+                                    + "set activity_description = @AD "
+                                    + "where activity_description_id = @ID";
+
+                    // Protect against SQL Injection Attacks.
+                    cmd.Parameters.AddWithValue( "@AD", newAct );
+                    cmd.Parameters.AddWithValue( "@ID", id );
+
+                    // We don't need rows back from this one, but this could
+                    // fail if the user tries to rename to an existing activity.
+                    if( cmd.ExecuteNonQuery() == 1 )
+                        // Let the user know the change succeeded.
+                        Console.WriteLine( $"Congratulations, {loggedIn.FirstName}...  \"{activity}\" is now \"{newAct}\"!" );
+                    else
+                        // Let the user know the change failed.
+                        Console.WriteLine( $"Sorry... It looks like category \"{activity}\" already exists!" );
+                }
+            }
+        }
+
+        private static void AddActivity()
+        {
+
         }
 
         // Program entry point.
