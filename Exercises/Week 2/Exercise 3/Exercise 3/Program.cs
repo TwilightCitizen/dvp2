@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Utilities.Terminal;
 
 using static Utilities.Terminal.IO;
@@ -91,6 +89,7 @@ namespace Exercise_3
         };
 
         /* These don't work as expected for this use case.  More below in comments.
+         
         // Stacks for Undo/Redo Support.  Somewhere, there's an abstraction
         // brewing to handle this more cleanly.
         private static Stack< List< Student > > undos = new Stack< List< Student > >();

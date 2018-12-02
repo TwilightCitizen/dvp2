@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Exercise_3
 {
@@ -12,7 +9,7 @@ namespace Exercise_3
         // making TakenCourses a class that inherits from List< TakenCourse >.
         public static decimal ToGPA( this List< TakenCourse > takenCourses )
         {
-            var points = new Dictionary< string, decimal>()
+            var points = new Dictionary< string, decimal >()
             {
                 [ "A" ] = 4M
             ,   [ "B" ] = 3M

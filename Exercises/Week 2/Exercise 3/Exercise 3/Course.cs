@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Exercise_3
+﻿namespace Exercise_3
 {
     // Named course instead of class to avoid clashing
     // with C# reserved words.
