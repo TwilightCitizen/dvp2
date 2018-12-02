@@ -1,4 +1,16 @@
-﻿using System;
+﻿/* Name:        David A. Clark, Jr.
+ * Class:       MDV2229-O
+ * Assignment:  2.2 - Coding Exercise - Exercise 3
+ * Date:        2018-12-01
+ * 
+ * Tasks:       Present the user with a console application that allows the
+ *              user to view and manipulate student grades.
+ *              
+ * Note:        Uses SuperMenu, various MenuOption subclasses, and PromptFor<T>
+ *              from referenced Utilities class library.
+ */
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Utilities.Terminal;
