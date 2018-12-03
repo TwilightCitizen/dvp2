@@ -905,8 +905,8 @@ namespace TimeTracker
                                     + "( activity_category_id "
                                     + ", category_description ) "
                                     + "values "
-                                    + "( ID"
-                                    + "  CD )";
+                                    + "( @ID"
+                                    + ", @CD )";
 
                     // Protect against SQL Injection Attacks.
                     cmd.Parameters.AddWithValue( "@CD", newCat );
@@ -1048,20 +1048,22 @@ namespace TimeTracker
                 using( var cmd = con.CreateCommand() )
                 {
                     cmd.CommandText = "insert into activity_descriptions "
-                                    + "( activity_descripton_id "
-                                    + ", activity_descripton ) "
+                                    + "( activity_description_id "
+                                    + ", activity_description ) "
                                     + "values "
-                                    + "( ID"
-                                    + "  CD )";
+                                    + "( @ID"
+                                    + ", @AD )";
 
                     // Protect against SQL Injection Attacks.
-                    cmd.Parameters.AddWithValue( "@CD", newAct );
+                    cmd.Parameters.AddWithValue( "@AD", newAct );
                     cmd.Parameters.AddWithValue( "@ID", id );
 
                     // We don't need rows back from this one, but this could
                     // fail if the user tries to rename to an existing Category.
                     try
                     {
+                        cmd.ExecuteNonQuery();
+
                         // Let the user know the change succeeded.
                         Console.WriteLine( $"Congratulations, {loggedIn.FirstName}...  \"{newAct}\" has been added!" );
 
