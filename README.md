@@ -10,6 +10,10 @@ Utilities Class Library encapsulates various classes and methods that I develope
 
 Time Tracker App is a database-connected console application that allows users to login and/or register an account with which he or she can track time spent on activities throughout the day with greater functionality than the Google Sheets time tracker first used by students in this course.
 
+# Postcard
+
+Postcard is an app somewhat inspired by studying the assumed design of iOS Mail--were it a console application supported by a relational database--but different all together.  In Postcard, registered users may send a postcard to any other registered user, and any registered user is free to browse all postcards sent.  It's kinda like how a real postcard is out in the open...  Anyone can read them once they're sent.
+
 # Coding Exercises
 
 ## Week 1
