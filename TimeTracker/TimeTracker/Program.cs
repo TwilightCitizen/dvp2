@@ -622,7 +622,7 @@ namespace TimeTracker
             // Let the user know we're paused.
             Console.WriteLine( "\nPress any key to continue..." );
             // Wait for user to hit a key.
-            Console.ReadLine();
+            Console.ReadKey();
         }
 
         // The following six methods also repeat a lot of code that
@@ -1107,11 +1107,19 @@ namespace TimeTracker
                         menuLogDays.Add( new ActionOnlyOption( 
                             string.Format( "{0} - Entries: {1}, Hours: {2}"
                                 ,   key.ToString()
-                                ,   loggedIn.Log.Where(  entry => entry.DayID == key ).Count()
+
+                                    // Get the number of entries this day.
+                                ,   loggedIn.Log.Where( entry =>
+                                        entry.DayID == key ).Count()
+                                    
+                                    // Get the total time logged for this day.
                                 ,   durations.Where( pair =>
-                                        loggedIn.Log.Select( entry =>
-                                            entry.DurationID ).Contains( pair.Value ) )
-                                                              .Select( pair => pair.Key ).Sum() )
+                                        loggedIn.Log.Where( entry =>
+                                            entry.DayID == key )
+                                                .Select( entry =>
+                                                    entry.DurationID )
+                                                        .Contains( pair.Value ) )
+                                                        .Select( pair => pair.Key ).Sum() )
                         ,   () => LogDay( key ) ) )
                 );
 
@@ -1609,7 +1617,8 @@ namespace TimeTracker
             Console.Clear();
 
             // Generate a new Activity Log ID.
-            var id = NextUserID();
+            // This doesn't work with an auto number field.
+            // var id = NextUserID();
 
             // Write the new Activity Log Entry to the database.
             using( var con = new MySqlConnection( cs ) )
@@ -1625,8 +1634,7 @@ namespace TimeTracker
                     // have deal with propagating nulls through everything,
                     // which would be too much pain to spare at this juncture.
                     cmd.CommandText = "insert into activity_log"
-                                    + "( id"
-                                    + ", user_id"
+                                    + "( user_id"
                                     + ", calendar_day"
                                     + ", calendar_date"
                                     + ", day_name"
@@ -1634,16 +1642,13 @@ namespace TimeTracker
                                     + ", activity_description"
                                     + ", time_spent_on_activity ) "
                                     + "values"
-                                    + "( @EID"
-                                    + ", @UID"
-                                    + ", 1, 1, 1, 1, 1, 1 )";
+                                    + "( @UID, 1, 1, 1, 1, 1, 1 )";
 
                     // Protect against SQL Injection Attacks.
                     // Technically not neccessary here, but good habits..
-                    cmd.Parameters.AddWithValue( "@EID", id          );
                     cmd.Parameters.AddWithValue( "@UID", loggedIn.ID );
 
-                    // We don't need rows back from this one.
+                    // We don't need rows back from this one...
                     cmd.ExecuteNonQuery();
 
                     // Let the user know the addition succeeded.
@@ -1655,7 +1660,7 @@ namespace TimeTracker
 
                     // Mirror what was just persisted to the database in the
                     // user's Activity Log Entry.
-                    entry.ID         = id;
+                    entry.ID         = (int) cmd.LastInsertedId;
                     entry.UserID     = loggedIn.ID;
                     entry.DayID      = 1;
                     entry.DateID     = 1;
