@@ -1101,7 +1101,7 @@ namespace TimeTracker
                 // Also feature the count of Activity Log entries
                 // for shown days.
                 days.Keys
-                    .Intersect( loggedIn.Log.Select( entry => entry.DateID ) )
+                    .Intersect( loggedIn.Log.Select( entry => entry.DayID ) )
                     .ToList()
                     .ForEach( key =>
                         menuLogDays.Add( new ActionOnlyOption( 
