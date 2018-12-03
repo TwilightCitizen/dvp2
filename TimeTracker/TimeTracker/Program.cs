@@ -1,7 +1,7 @@
 ﻿/* Name:        David A. Clark, Jr.
  * Class:       MDV2229-O
  * Assignment:  2.3 - Time Tracker Application
- * Date:        2018-12-02
+ * Date:        2018-12-03
  * 
  * Tasks:       Time Tracker App is a database-connected console application that
  *              allows users to login and/or register an account with which he or
@@ -16,8 +16,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Utilities.Terminal;
 using static Utilities.Terminal.IO;
 using MySql.Data.MySqlClient;
@@ -328,23 +326,14 @@ namespace TimeTracker
                         {
                             var entry = new LogEntry();
 
-                            /*entry.ID         = int.Parse( rdr[  "id"                    ].ToString() );
+                            entry.ID         = int.Parse( rdr[  "id"                    ].ToString() );
                             entry.UserID     = int.Parse( rdr[  "user_id"               ].ToString() );
                             entry.DayID      = int.Parse( rdr[ "calendar_day"           ].ToString() );
                             entry.DateID     = int.Parse( rdr[ "calendar_date"          ].ToString() );
                             entry.WeekdayID  = int.Parse( rdr[ "day_name"               ].ToString() );
                             entry.CategoryID = int.Parse( rdr[ "category_description"   ].ToString() );
                             entry.ActivityID = int.Parse( rdr[ "activity_description"   ].ToString() );
-                            entry.DurationID = int.Parse( rdr[ "time_spent_on_activity" ].ToString() );*/
-
-                            entry.ID         = rdr[  "id"                    ] as int? ?? null;
-                            entry.UserID     = rdr[  "user_id"               ] as int? ?? null;
-                            entry.DayID      = rdr[ "calendar_day"           ] as int? ?? null;
-                            entry.DateID     = rdr[ "calendar_date"          ] as int? ?? null;
-                            entry.WeekdayID  = rdr[ "day_name"               ] as int? ?? null;
-                            entry.CategoryID = rdr[ "category_description"   ] as int? ?? null;
-                            entry.ActivityID = rdr[ "activity_description"   ] as int? ?? null;
-                            entry.DurationID = rdr[ "time_spent_on_activity" ] as int? ?? null;
+                            entry.DurationID = int.Parse( rdr[ "time_spent_on_activity" ].ToString() );
 
                             loggedIn.Log.Add( entry );
                         }
@@ -499,7 +488,9 @@ namespace TimeTracker
 
                 // Display the Profile Edit Menu.
                 choice = menuProfile.Run();
-                Pause();
+
+                // Don't pause twice for Return/GoBack
+                if( choice != optReturn.Text ) Pause();
             }
         }
 
@@ -693,7 +684,8 @@ namespace TimeTracker
 
                 using( var cmd = con.CreateCommand() )
                 {
-                    cmd.CommandText = "select * from activity_times";
+                    cmd.CommandText = "select * from activity_times "
+                                    + "order by time_spent_on_activity";
 
                     using( MySqlDataReader rdr = cmd.ExecuteReader() )
                     {
@@ -715,7 +707,8 @@ namespace TimeTracker
 
                 using( var cmd = con.CreateCommand() )
                 {
-                    cmd.CommandText = "select * from days_of_week";
+                    cmd.CommandText = "select * from days_of_week "
+                                    + "order by day_id";
 
                     using( MySqlDataReader rdr = cmd.ExecuteReader() )
                     {
@@ -788,7 +781,9 @@ namespace TimeTracker
 
                 // Display the Lookups Edit Menu.
                 choice = menuLookups.Run();
-                Pause();
+
+                // Don't pause twice for Return/GoBack
+                if( choice != optReturn.Text ) Pause();
             }
         }
 
@@ -825,7 +820,9 @@ namespace TimeTracker
 
                 // Display the Categories Edit Menu.
                 choice = menuCategories.Run();
-                Pause();
+
+                // Don't pause twice for Return/GoBack.
+                if( choice != optGoBack.Text ) Pause();
             }
         }
 
@@ -969,7 +966,9 @@ namespace TimeTracker
 
                 // Display the Categories Edit Menu.
                 choice = menuActivities.Run();
-                Pause();
+
+                // Don't pause twice for Return/GoBack
+                if( choice != optGoBack.Text ) Pause();
             }
         }
 
@@ -1096,10 +1095,18 @@ namespace TimeTracker
                 menuLogDays.Clear();
 
                 // Insert all the Numerical Days as menu options
-                // to drill down the log to that Day.
-                days.Keys.ToList().ForEach( key =>
-                    menuLogDays.Add( new ActionOnlyOption( 
-                        key.ToString(), () => LogDay( key ) ) )
+                // where the user has Activity Log entries that day
+                // Also feature the count of Activity Log entries
+                // for shown days.
+                days.Keys
+                    .Intersect( loggedIn.Log.Select( entry => entry.DateID ) )
+                    .ToList()
+                    .ForEach( key =>
+                        menuLogDays.Add( new ActionOnlyOption( 
+                            string.Format( "{0} - Entries: {1}"
+                                ,   key.ToString()
+                                ,   loggedIn.Log.Where( entry => entry.DayID == key ).Count() )
+                        ,   () => LogDay( key ) ) )
                 );
 
                 // Add an option to Go Back.
@@ -1107,7 +1114,9 @@ namespace TimeTracker
 
                 // Display the Categories Edit Menu.
                 choice = menuLogDays.Run();
-                Pause();
+
+                // Don't pause twice for Return/GoBack
+                if( choice != optGoBack.Text ) Pause();
             }
         }
 
@@ -1157,7 +1166,9 @@ namespace TimeTracker
 
                 // Display the Categories Edit Menu.
                 choice = menuLogEntries.Run();
-                Pause();
+
+                // Don't pause twice for Return/GoBack
+                if( choice != optGoBack.Text ) Pause();
             }
         }
 
@@ -1180,27 +1191,27 @@ namespace TimeTracker
                             + string.Format(
                                 "Day:       {0}\n"
                             ,   days.Where( d => d.Value == entry.DayID )
-                                    .Select( d => d.Key ).FirstOrDefault().ToString() ?? "" )
+                                    .Select( d => d.Key ).First().ToString() )
                             + string.Format( 
                                 "Weekday:   {0}\n"
                             ,   weekdays.Where( wd => wd.Value == entry.WeekdayID )
-                                    .Select( wd => wd.Key ).FirstOrDefault().ToString() ?? "" )
+                                    .Select( wd => wd.Key ).First().ToString() )
                             + string.Format(
                                 "Date:      {0}\n"
                             ,   dates.Where( dt => dt.Value == entry.DateID )
-                                    .Select( dt => dt.Key ).FirstOrDefault().ToString( "yyyy-MM-dd" ) ?? "" )
+                                    .Select( dt => dt.Key ).First().ToString( "yyyy-MM-dd" ) )
                             + string.Format(
                                 "Category:  {0}\n"
                             ,   categories.Where( cat => cat.Value == entry.CategoryID )
-                                    .Select( cat => cat.Key ).FirstOrDefault().ToString() ?? "" )
+                                    .Select( cat => cat.Key ).First().ToString() )
                             + string.Format(
                                 "Activity:  {0}\n"
                             ,    activities.Where( act => act.Value == entry.ActivityID )
-                                    .Select( act => act.Key ).FirstOrDefault().ToString() ?? "" )
+                                    .Select( act => act.Key ).First().ToString() )
                             + string.Format(
                                 "Duration:  {0}\n\n"
                             ,    durations.Where( dur => dur.Value == entry.DurationID )
-                                    .Select( dur => dur.Key ).FirstOrDefault().ToString() ?? "" )
+                                    .Select( dur => dur.Key ).First().ToString() )
                             + "What would you like to do?";
 
                 // Set up the chosen entry's edit menu.  Must be done here so
@@ -1244,7 +1255,9 @@ namespace TimeTracker
 
                 // Display the Profile Edit Menu.
                 choice = menuEntry.Run();
-                Pause();
+
+                // Don't pause twice for Return/GoBack
+                if( choice != optGoBack.Text ) Pause();
             }
         }
 
@@ -1582,7 +1595,7 @@ namespace TimeTracker
         }
 
         // Adds a new, virtually empty Activity Log Entry for the
-        // user and situates him or her to edit it.
+        // user and leads him or her through editing it.
         private static void AddEntry()
         {
             // Clear the Console for nicer output.
@@ -1598,12 +1611,25 @@ namespace TimeTracker
 
                 using( var cmd = con.CreateCommand() )
                 {
+                    // The user will be lead through updating everything but
+                    // the ID and UserID; however, we need to assign sane
+                    // defaults ahead of time in case the user closes the app
+                    // halfway through updating the record.  Otherwise, we
+                    // have deal with propagating nulls through everything,
+                    // which would be too much pain to spare at this juncture.
                     cmd.CommandText = "insert into activity_log"
                                     + "( id"
-                                    + ", user_id ) "
+                                    + ", user_id"
+                                    + ", calendar_day"
+                                    + ", calendar_date"
+                                    + ", day_name"
+                                    + ", category_description"
+                                    + ", activity_description"
+                                    + ", time_spent_on_activity ) "
                                     + "values"
                                     + "( @EID"
-                                    + ", @UID )";
+                                    + ", @UID"
+                                    + ", 1, 1, 1, 1, 1, 1 )";
 
                     // Protect against SQL Injection Attacks.
                     // Technically not neccessary here, but good habits..
@@ -1620,15 +1646,29 @@ namespace TimeTracker
                     // Keep the logged in user's log in sync with the database.
                     var entry = new LogEntry();
 
-                    entry.ID     = id;
-                    entry.UserID = loggedIn.ID;
+                    // Mirror what was just persisted to the database in the
+                    // user's Activity Log Entry.
+                    entry.ID         = id;
+                    entry.UserID     = loggedIn.ID;
+                    entry.DayID      = 1;
+                    entry.DateID     = 1;
+                    entry.WeekdayID  = 1;
+                    entry.CategoryID = 1;
+                    entry.ActivityID = 1;
+                    entry.DurationID = 1;
 
                     loggedIn.Log.Add( entry );
 
                     Pause();
 
-                    // Drop the user into editing the entry.
-                    LogEntry( entry );
+                    // Lead the user into editing the entry.  If they kill the
+                    // app partway through editing, no big deal now.
+                    ChangeDay(      entry );
+                    ChangeDate(     entry );
+                    ChangeWeekday(  entry );
+                    ChangeCategory( entry );
+                    ChangeActivity( entry );
+                    ChangeDuration( entry );
                 }
             }
         }
