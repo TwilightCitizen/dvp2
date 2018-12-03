@@ -1099,17 +1099,22 @@ namespace TimeTracker
                 // Insert all the Numerical Days as menu options
                 // where the user has Activity Log entries that day
                 // Also feature the count of Activity Log entries
-                // for shown days.
+                // for shown days with total Duration for each.
                 days.Keys
                     .Intersect( loggedIn.Log.Select( entry => entry.DayID ) )
                     .ToList()
                     .ForEach( key =>
                         menuLogDays.Add( new ActionOnlyOption( 
-                            string.Format( "{0} - Entries: {1}"
+                            string.Format( "{0} - Entries: {1}, Hours: {2}"
                                 ,   key.ToString()
-                                ,   loggedIn.Log.Where( entry => entry.DayID == key ).Count() )
+                                ,   loggedIn.Log.Where(  entry => entry.DayID == key ).Count()
+                                ,   durations.Where( pair =>
+                                        loggedIn.Log.Select( entry =>
+                                            entry.DurationID ).Contains( pair.Value ) )
+                                                              .Select( pair => pair.Key ).Sum() )
                         ,   () => LogDay( key ) ) )
                 );
+
 
                 // Add an option to Go Back.
                 menuLogDays.Add( optGoBack );
