@@ -69,7 +69,7 @@ namespace TimeTracker
         ( 
             "Logout of Your Account"
         ,   Logout
-        ,   conditions : new List< Func< bool >>()
+        ,   conditions : new List< Func< bool > >()
             {
                 () => loggedIn != null
             }
@@ -95,6 +95,26 @@ namespace TimeTracker
             }
         );
 
+        private static MenuOption optLog        = new ActionOnlyOption
+        (
+            "View or Edit Your Activity Log"
+        ,   Log
+        ,   conditions : new List< Func < bool > >()
+            {
+                () => loggedIn != null
+            }
+        );
+
+        private static MenuOption optAddEntry   = new ActionOnlyOption
+        (
+            "Add an Entry to Your Activity Log"
+        ,   AddEntry
+        ,   conditions : new List< Func < bool > >()
+            {
+                () => loggedIn != null
+            }
+        );
+
         private static MenuOption optExit       = new ExitOption();
 
         // Main Menu.
@@ -104,6 +124,8 @@ namespace TimeTracker
         ,   optLogin
         ,   optLogout
         ,   optProfile
+        ,   optLog
+        ,   optAddEntry
         ,   optLookups
         ,   optExit
         };
@@ -167,7 +189,7 @@ namespace TimeTracker
         ,   optReturn
         };
 
-        // Option for Lookup View Edit Submenus
+        // Options for Lookup View Edit Submenus
 
         private static MenuOption optAddNew;
         private static MenuOption optGoBack = new CancelOption
@@ -187,12 +209,31 @@ namespace TimeTracker
             "Which Activity would you like to View or Edit?"
         );
 
+        // Log Day Menu.
+        private static SuperMenu menuLogDays    = new SuperMenu
+        (
+            "Which Day of your Activity Log do you want to View or Edit?"
+        );
+
+        private static SuperMenu menuLogEntries = new SuperMenu
+        (
+            "Which Entry for this Day do you want to View or Edit?"
+        );
+
+        // Entry Menu.
+        private static SuperMenu menuEntry      = new SuperMenu
+        (
+            "Which Field would you like to Edit?"
+        );
+
         // Prompt the user for the User ID and Password to attempt
         // logging in.  Note that Login presently sends Pasword in
         // the clear because the Time Tracker database was prescribed
         // to be built with a password field too short to store a
         // secure hash.  Plus, we don't know how to establish
         // secure connections with public key encryption yet.
+        // Successful login populates the user's Profile and Activity
+        // log.
         private static void Login()
         {
             // Clear the console for nicer output.
@@ -244,6 +285,8 @@ namespace TimeTracker
                             loggedIn.FirstName = rdr[ "user_firstname" ].ToString();
                             loggedIn.LastName  = rdr[ "user_lastname"  ].ToString();
 
+                            LoadLog();
+
                             // Let the user know login was successfull.
                             Console.WriteLine( $"Welcome, {loggedIn.FirstName}!" );
                         }
@@ -252,6 +295,58 @@ namespace TimeTracker
                             // Login was unsuccessfull.
                             Console.WriteLine( "No user was found with that username and password.\n"
                                              + "Try logging in again or registering from the main menu." );
+                        }
+                    }
+                }
+            }
+        }
+
+        // Loads the user's Activity Log.  Could have been
+        // done in Login, but wanted to keep the method
+        // from getting far too long.
+        private static void LoadLog()
+        {
+            using( var con = new MySqlConnection( cs ) )
+            {
+                con.Open();
+
+                using( var cmd = con.CreateCommand() )
+                {
+                    // Log entries where User ID matches Logged In User.
+                    cmd.CommandText = "select * from activity_log "
+                                    + "where user_id = @ID ";
+
+                    // Technically don't need this now, but good habit.
+                    // Why leave it to chance, you know?
+                    cmd.Parameters.AddWithValue( "@ID", loggedIn.ID );
+
+                    using( MySqlDataReader rdr = cmd.ExecuteReader() )
+                    {
+                        // Add the Activity Log Entries to the Logged In
+                        // User's Log.
+                        while( rdr.Read() )
+                        {
+                            var entry = new LogEntry();
+
+                            /*entry.ID         = int.Parse( rdr[  "id"                    ].ToString() );
+                            entry.UserID     = int.Parse( rdr[  "user_id"               ].ToString() );
+                            entry.DayID      = int.Parse( rdr[ "calendar_day"           ].ToString() );
+                            entry.DateID     = int.Parse( rdr[ "calendar_date"          ].ToString() );
+                            entry.WeekdayID  = int.Parse( rdr[ "day_name"               ].ToString() );
+                            entry.CategoryID = int.Parse( rdr[ "category_description"   ].ToString() );
+                            entry.ActivityID = int.Parse( rdr[ "activity_description"   ].ToString() );
+                            entry.DurationID = int.Parse( rdr[ "time_spent_on_activity" ].ToString() );*/
+
+                            entry.ID         = rdr[  "id"                    ] as int? ?? null;
+                            entry.UserID     = rdr[  "user_id"               ] as int? ?? null;
+                            entry.DayID      = rdr[ "calendar_day"           ] as int? ?? null;
+                            entry.DateID     = rdr[ "calendar_date"          ] as int? ?? null;
+                            entry.WeekdayID  = rdr[ "day_name"               ] as int? ?? null;
+                            entry.CategoryID = rdr[ "category_description"   ] as int? ?? null;
+                            entry.ActivityID = rdr[ "activity_description"   ] as int? ?? null;
+                            entry.DurationID = rdr[ "time_spent_on_activity" ] as int? ?? null;
+
+                            loggedIn.Log.Add( entry );
                         }
                     }
                 }
@@ -304,7 +399,7 @@ namespace TimeTracker
             Console.Clear();
 
             // Set the user's ID up.
-            var id = NextUniqueID();
+            var id = NextUserID();
 
             // Tell the user about his or her User ID,
             Console.WriteLine( $"Your User ID is {id}.  Make sure you remember it.\n"
@@ -348,7 +443,7 @@ namespace TimeTracker
 
         // Finds the highest User ID Number in Time Tracker Users
         // and returns the next highest number.
-        private static int NextUniqueID()
+        private static int NextUserID()
         {
             using( var con = new MySqlConnection( cs ) )
             {
@@ -440,12 +535,12 @@ namespace TimeTracker
 
                     // Protect against SQL Injection Attacks.
                     cmd.Parameters.AddWithValue( "@FN", loggedIn.FirstName );
-                    cmd.Parameters.AddWithValue( "@ID", loggedIn.ID );
+                    cmd.Parameters.AddWithValue( "@ID", loggedIn.ID        );
 
                     // We don't need rows back from this one.
                     cmd.ExecuteNonQuery();
 
-                    // Let the user know registration succeeded.
+                    // Let the user know the change succeeded.
                     Console.WriteLine( $"Congratulations, {loggedIn.FirstName}...  Your First Name is updated!" );
                 }
             }
@@ -479,12 +574,12 @@ namespace TimeTracker
 
                     // Protect against SQL Injection Attacks.
                     cmd.Parameters.AddWithValue( "@LN", loggedIn.LastName );
-                    cmd.Parameters.AddWithValue( "@ID", loggedIn.ID );
+                    cmd.Parameters.AddWithValue( "@ID", loggedIn.ID       );
 
                     // We don't need rows back from this one.
                     cmd.ExecuteNonQuery();
 
-                    // Let the user know registration succeeded.
+                    // Let the user know the change succeeded.
                     Console.WriteLine( $"Congratulations, {loggedIn.FirstName}...  Your Last Name is updated!" );
                 }
             }
@@ -518,12 +613,12 @@ namespace TimeTracker
 
                     // Protect against SQL Injection Attacks.
                     cmd.Parameters.AddWithValue( "@PW", loggedIn.Password );
-                    cmd.Parameters.AddWithValue( "@ID", loggedIn.ID );
+                    cmd.Parameters.AddWithValue( "@ID", loggedIn.ID       );
 
                     // We don't need rows back from this one.
                     cmd.ExecuteNonQuery();
 
-                    // Let the user know registration succeeded.
+                    // Let the user know the change succeeded.
                     Console.WriteLine( $"Congratulations, {loggedIn.FirstName}...  Your password is updated!" );
                 }
             }
@@ -671,7 +766,8 @@ namespace TimeTracker
                         // Insert all Days.
                         while( rdr.Read() )
                             days[ int.Parse( rdr[ "calendar_numerical_day" ].ToString() ) ] =
-                                int.Parse( rdr[ "calendar_day_id" ].ToString() );
+                                  int.Parse( rdr[ "calendar_day_id" ].ToString() );
+
                     }
                 }
             }
@@ -740,18 +836,13 @@ namespace TimeTracker
             // Clear the Console for cleaner output.
             Console.Clear();
 
-            // Get the ID for the Category and remove it
-            // from the dictionary.
+            // Get the ID for the Category.
             int id = categories[ category ];
-            categories.Remove( category );
 
             // Get the new Category Name from the user.
             string newCat = PromptFor< string >( $"What new name would you like for the category \"{category}\"?"
                                                , "The category name cannot be blank or more than 10 characters.  Try again."
                                                , cat => !string.IsNullOrEmpty( cat ) && cat.Length <= 10 );
-
-            // Add it as the key for the ID to the dictionary.
-            categories[ newCat ] = id;
 
             // Update the database accordingly.
             using( var con = new MySqlConnection( cs ) )
@@ -770,19 +861,79 @@ namespace TimeTracker
 
                     // We don't need rows back from this one, but this could
                     // fail if the user tries to rename to an existing Category.
-                    if( cmd.ExecuteNonQuery() == 1 )
+                    try
+                    {
+                        cmd.ExecuteNonQuery();
+
                         // Let the user know the change succeeded.
                         Console.WriteLine( $"Congratulations, {loggedIn.FirstName}...  \"{category}\" is now \"{newCat}\"!" );
-                    else
+
+                        // Add it as the key for the ID to the dictionary,
+                        // and remove the old one.
+                        categories[ newCat ] = id;
+                        categories.Remove( category );
+                    }
+                    catch
+                    {
                         // Let the user know the change failed.
                         Console.WriteLine( $"Sorry... It looks like category \"{category}\" already exists!" );
+                    }
                 }
             }
         }
 
+        // Prompt the user for a new Category, adding it
+        // to the list and database.
         private static void AddCategory()
         {
+            // Clear the Console for cleaner output.
+            Console.Clear();
 
+            // Get a new ID for the Category-to-be.
+            int id = categories.Values.Max() + 1;
+
+            // Get the new Category Name from the user.
+            string newCat = PromptFor< string >( $"What name would you like for this new category?"
+                                               , "The category name cannot be blank or more than 10 characters.  Try again."
+                                               , cat => !string.IsNullOrEmpty( cat ) && cat.Length <= 10 );
+
+            // Update the database accordingly.
+            using( var con = new MySqlConnection( cs ) )
+            {
+                con.Open();
+
+                using( var cmd = con.CreateCommand() )
+                {
+                    cmd.CommandText = "insert into activity_categories "
+                                    + "( activity_category_id "
+                                    + ", category_description ) "
+                                    + "values "
+                                    + "( ID"
+                                    + "  CD )";
+
+                    // Protect against SQL Injection Attacks.
+                    cmd.Parameters.AddWithValue( "@CD", newCat );
+                    cmd.Parameters.AddWithValue( "@ID", id );
+
+                    // We don't need rows back from this one, but this could
+                    // fail if the user tries to add an existing Category.
+                    try
+                    {
+                        cmd.ExecuteNonQuery();
+
+                        // Let the user know the add succeeded.
+                        Console.WriteLine( $"Congratulations, {loggedIn.FirstName}...  \"{newCat}\" has been added!" );
+
+                        // Add it as the key for the ID to the dictionary.
+                        categories[ newCat ] = id;
+                    }
+                    catch
+                    {
+                        // Let the user know the add failed.
+                        Console.WriteLine( $"Sorry... It looks like category \"{newCat}\" already exists!" );
+                    }
+                }
+            }
         }
 
         // Clear out the Activities Menu and load it fresh
@@ -829,18 +980,13 @@ namespace TimeTracker
             // Clear the Console for cleaner output.
             Console.Clear();
 
-            // Get the ID for the Category and remove it
-            // from the dictionary.
+            // Get the ID for the Category.
             int id = activities[ activity ];
-            activities.Remove( activity );
-
+            
             // Get the new Category Name from the user.
             string newAct = PromptFor< string >( $"What new name would you like for the activity \"{activity}\"?"
                                                , "The activity name cannot be blank or more than 25 characters.  Try again."
                                                , act => !string.IsNullOrEmpty( act ) && act.Length <= 25 );
-
-            // Add it as the key for the ID to the dictionary.
-            activities[ newAct ] = id;
 
             // Update the database accordingly.
             using( var con = new MySqlConnection( cs ) )
@@ -858,20 +1004,666 @@ namespace TimeTracker
                     cmd.Parameters.AddWithValue( "@ID", id );
 
                     // We don't need rows back from this one, but this could
-                    // fail if the user tries to rename to an existing activity.
-                    if( cmd.ExecuteNonQuery() == 1 )
+                    // fail if the user tries to add an existing activity.
+                    try
+                    {
+                        cmd.ExecuteNonQuery();
+
                         // Let the user know the change succeeded.
                         Console.WriteLine( $"Congratulations, {loggedIn.FirstName}...  \"{activity}\" is now \"{newAct}\"!" );
-                    else
+
+                        // Add it as the key for the ID to the dictionary
+                        // and remove the old one.
+                        activities[ newAct ] = id;
+                        activities.Remove( activity );
+                    }
+                    catch
+                    {
                         // Let the user know the change failed.
                         Console.WriteLine( $"Sorry... It looks like category \"{activity}\" already exists!" );
+                    }
                 }
             }
         }
 
+        // Prompt the user for a new Activity, adding it
+        // to the list and database.
         private static void AddActivity()
         {
+            // Clear the Console for cleaner output.
+            Console.Clear();
 
+            // Get a new ID for the Activity-to-be.
+            int id = activities.Values.Max() + 1;
+
+            // Get the new Activity Name from the user.
+            string newAct = PromptFor< string >( $"What name would you like for this new activity?"
+                                               , "The activity name cannot be blank or more than 25 characters.  Try again."
+                                               , act => !string.IsNullOrEmpty( act ) && act.Length <= 25 );
+
+            // Update the database accordingly.
+            using( var con = new MySqlConnection( cs ) )
+            {
+                con.Open();
+
+                using( var cmd = con.CreateCommand() )
+                {
+                    cmd.CommandText = "insert into activity_descriptions "
+                                    + "( activity_descripton_id "
+                                    + ", activity_descripton ) "
+                                    + "values "
+                                    + "( ID"
+                                    + "  CD )";
+
+                    // Protect against SQL Injection Attacks.
+                    cmd.Parameters.AddWithValue( "@CD", newAct );
+                    cmd.Parameters.AddWithValue( "@ID", id );
+
+                    // We don't need rows back from this one, but this could
+                    // fail if the user tries to rename to an existing Category.
+                    try
+                    {
+                        // Let the user know the change succeeded.
+                        Console.WriteLine( $"Congratulations, {loggedIn.FirstName}...  \"{newAct}\" has been added!" );
+
+                        // Add it as the key for the ID to the dictionary.
+                        activities[ newAct ] = id;
+                    }
+                    catch
+                    {
+                        // Let the user know the change failed.
+                        Console.WriteLine( $"Sorry... It looks like category \"{newAct}\" already exists!" );
+                    }
+                }
+            }
+        }
+
+        // Prompt the user for the Numerical Day to drill down
+        // into their Activity Log, sparing the user with too
+        // many results to discern.  Give the option to go back.
+        private static void Log()
+        {
+            // For checking when the user exits.
+            string choice = null;
+
+            // Wait until the user wants to go back.
+            while( choice != optGoBack.Text )
+            {
+                // Clear the console for nicer ouput.
+                Console.Clear();
+
+                // Clear the menu.
+                menuLogDays.Clear();
+
+                // Insert all the Numerical Days as menu options
+                // to drill down the log to that Day.
+                days.Keys.ToList().ForEach( key =>
+                    menuLogDays.Add( new ActionOnlyOption( 
+                        key.ToString(), () => LogDay( key ) ) )
+                );
+
+                // Add an option to Go Back.
+                menuLogDays.Add( optGoBack );
+
+                // Display the Categories Edit Menu.
+                choice = menuLogDays.Run();
+                Pause();
+            }
+        }
+
+        // Prompt the user for the Activity Log Entry to View
+        // or Edit.  Give the user options to add new Activity
+        // Log Entries for this Numerical Day and to go back.
+        private static void LogDay( int day )
+        {
+            // For checking when the user exits.
+            string choice = null;
+
+            // Wait until the user wants to go back.
+            while( choice != optGoBack.Text )
+            {
+                // Clear the menu.
+                menuLogEntries.Clear();
+
+                // Insert all the Activity Log Entries for the
+                // chosen Numerical DAy as menu options.
+                loggedIn.Log
+                    .Where( entry => entry.DayID == day )
+                    .ToList()
+                    .ForEach( entry =>
+                        menuLogEntries.Add( new ActionOnlyOption(
+                            string.Format(
+                                "{0}, {1}: {2}/{3} - {4}"
+                                
+                                // The way the simple lookup dictionaries are set up
+                                // makes updating them easy, but lookups are a little
+                                // more involving.  I'd rather have the destructive
+                                // operations easier to get write.
+                            ,   weekdays.Where( wd => wd.Value == entry.WeekdayID )
+                                    .Select( wd => wd.Key ).First().ToString()
+                            ,   dates.Where( dt => dt.Value == entry.DateID )
+                                    .Select( dt => dt.Key ).First().ToString( "yyyy-MM-dd" )
+                            ,   categories.Where( cat => cat.Value == entry.CategoryID )
+                                    .Select( cat => cat.Key ).First().ToString()
+                            ,   activities.Where( act => act.Value == entry.ActivityID )
+                                    .Select( act => act.Key ).First().ToString()
+                            ,   durations.Where(  dur => dur.Value == entry.DurationID )
+                                    .Select( dur => dur.Key ).First().ToString() )
+                        ,   () => LogEntry( entry ) ) )
+                    );
+
+                // Add an option to Go Back.
+                menuLogEntries.Add( optGoBack );
+
+                // Display the Categories Edit Menu.
+                choice = menuLogEntries.Run();
+                Pause();
+            }
+        }
+
+        // Prompt the user with menu to edit the selected Activity
+        // Log Entry or go back.
+        private static void LogEntry( LogEntry entry )
+        {
+            // For checking when the user exits.
+            string choice = null;
+
+            // Wait until the user wants to return to the Main Menu, or
+            // he or she deleted the selected entry.
+            while( choice != optGoBack.Text && loggedIn.Log.Contains( entry ) )
+            {
+                // Clear the console for nicer ouput.
+                Console.Clear();
+
+                // Feed the chosen entry's data into the menu prompt.
+                string text = "Here's the log entry you selected...\n\n"
+                            + string.Format(
+                                "Day:       {0}\n"
+                            ,   days.Where( d => d.Value == entry.DayID )
+                                    .Select( d => d.Key ).FirstOrDefault().ToString() ?? "" )
+                            + string.Format( 
+                                "Weekday:   {0}\n"
+                            ,   weekdays.Where( wd => wd.Value == entry.WeekdayID )
+                                    .Select( wd => wd.Key ).FirstOrDefault().ToString() ?? "" )
+                            + string.Format(
+                                "Date:      {0}\n"
+                            ,   dates.Where( dt => dt.Value == entry.DateID )
+                                    .Select( dt => dt.Key ).FirstOrDefault().ToString( "yyyy-MM-dd" ) ?? "" )
+                            + string.Format(
+                                "Category:  {0}\n"
+                            ,   categories.Where( cat => cat.Value == entry.CategoryID )
+                                    .Select( cat => cat.Key ).FirstOrDefault().ToString() ?? "" )
+                            + string.Format(
+                                "Activity:  {0}\n"
+                            ,    activities.Where( act => act.Value == entry.ActivityID )
+                                    .Select( act => act.Key ).FirstOrDefault().ToString() ?? "" )
+                            + string.Format(
+                                "Duration:  {0}\n\n"
+                            ,    durations.Where( dur => dur.Value == entry.DurationID )
+                                    .Select( dur => dur.Key ).FirstOrDefault().ToString() ?? "" )
+                            + "What would you like to do?";
+
+                // Set up the chosen entry's edit menu.  Must be done here so
+                // we can pass the entry through the appropriate edit method.
+                menuEntry.Clear();
+
+                // The user should not be able to change the entry's ID or User ID.
+
+                menuEntry.Add( new ActionOnlyOption(
+                    "Change the Numerical Day"
+                ,   () => ChangeDay( entry ) ) );
+
+                menuEntry.Add( new ActionOnlyOption(
+                    "Change the Date"
+                ,   () => ChangeDate( entry ) ) );
+
+                menuEntry.Add( new ActionOnlyOption(
+                    "Change the Weekday"
+                ,   () => ChangeWeekday( entry ) ) );
+
+                menuEntry.Add( new ActionOnlyOption(
+                    "Change the Category"
+                ,   () => ChangeCategory( entry ) ) );
+
+                menuEntry.Add( new ActionOnlyOption(
+                    "Change the Activity"
+                ,   () => ChangeActivity( entry ) ) );
+
+                menuEntry.Add( new ActionOnlyOption(
+                    "Change the Duration"
+                ,   () => ChangeDuration( entry ) ) );
+
+                menuEntry.Add( new ActionOnlyOption(
+                    "Delete the Entry"
+                ,   () => DeleteEntry( entry ) ) );
+
+                // Make sure the user can cancel the edit.
+                menuEntry.Add( optGoBack );
+
+                menuEntry.Prompt = text;
+
+                // Display the Profile Edit Menu.
+                choice = menuEntry.Run();
+                Pause();
+            }
+        }
+
+        // Present the user with a menu of Numerical Days with which
+        // the selected Activity Log Entry's Numerical Day can be set,
+        // updating the entry with the user's choice and the database.
+        private static void ChangeDay( LogEntry entry )
+        {
+            // Clear the console for nicer output.
+            Console.Clear();
+
+            var dayMenu = new SuperMenu( "With which Numerical Day would you like to update this entry?" );
+
+            // Load all the Numerical Days into the Day Menu.
+            days.Keys.ToList().ForEach( day =>
+                dayMenu.Add( new ActionOnlyOption(
+                    day.ToString(), () => { } ) ) );
+
+            // Get the user's new Numerical Day.
+            entry.DayID = int.Parse( dayMenu.Run() );
+
+            // Clear the console for nicer output.
+            Console.Clear();
+
+            // Update the user's information on the database.
+            using( var con = new MySqlConnection( cs ) )
+            {
+                con.Open();
+
+                using( var cmd = con.CreateCommand() )
+                {
+                    cmd.CommandText = "update activity_log "
+                                    + "set calendar_day = @CD "
+                                    + "where user_id = @UID "
+                                    + "and id = @EID";
+
+                    // Protect against SQL Injection Attacks.
+                    cmd.Parameters.AddWithValue( "@CD",  entry.DayID );
+                    cmd.Parameters.AddWithValue( "@UID", loggedIn.ID );
+                    cmd.Parameters.AddWithValue( "@EID", entry.ID    );
+
+                    // We don't need rows back from this one.
+                    cmd.ExecuteNonQuery();
+
+                    // Let the user know the change succeeded.
+                    Console.WriteLine( $"Congratulations, {loggedIn.FirstName}...  The numerical day is updated!" );
+                }
+            }
+        }
+
+        // Present the user with a menu of Dates with which
+        // the selected Activity Log Entry's Date can be set,
+        // updating the entry with the user's choice and the database.
+        private static void ChangeDate( LogEntry entry )
+        {
+            // Clear the console for nicer output.
+            Console.Clear();
+
+            var dateMenu = new SuperMenu( "With which Date would you like to update this entry?" );
+
+            // Load all the Dates into the Day Menu.
+            dates.Keys.ToList().ForEach( date =>
+                dateMenu.Add( new ActionOnlyOption(
+                    date.ToString( "yyyy-MM-dd" ), () => { } ) ) );
+
+            // Get the user's new Numerical Day.
+            entry.DateID = dates[ DateTime.Parse( dateMenu.Run() ) ];
+
+            // Clear the console for nicer output.
+            Console.Clear();
+
+            // Update the user's information on the database.
+            using( var con = new MySqlConnection( cs ) )
+            {
+                con.Open();
+
+                using( var cmd = con.CreateCommand() )
+                {
+                    cmd.CommandText = "update activity_log "
+                                    + "set calendar_date = @CD "
+                                    + "where user_id = @UID "
+                                    + "and id = @EID";
+
+                    // Protect against SQL Injection Attacks.
+                    cmd.Parameters.AddWithValue( "@CD",  entry.DateID );
+                    cmd.Parameters.AddWithValue( "@UID", loggedIn.ID  );
+                    cmd.Parameters.AddWithValue( "@EID", entry.ID     );
+
+                    // We don't need rows back from this one.
+                    cmd.ExecuteNonQuery();
+
+                    // Let the user know the change succeeded.
+                    Console.WriteLine( $"Congratulations, {loggedIn.FirstName}...  The date is updated!" );
+                }
+            }
+        }
+
+        // Present the user with a menu of Weekdays with which
+        // the selected Activity Log Entry's Weekday can be set,
+        // updating the entry with the user's choice and the database.
+        private static void ChangeWeekday( LogEntry entry )
+        {
+            // Clear the console for nicer output.
+            Console.Clear();
+
+            var weekdayMenu = new SuperMenu( "With which Weekday would you like to update this entry?" );
+
+            // Load all the Dates into the Day Menu.
+            weekdays.Keys.ToList().ForEach( wd =>
+                weekdayMenu.Add( new ActionOnlyOption(
+                    wd, () => { } ) ) );
+
+            // Get the user's new Weekday.
+            entry.WeekdayID = weekdays[ weekdayMenu.Run() ];
+
+            // Clear the console for nicer output.
+            Console.Clear();
+
+            // Update the user's information on the database.
+            using( var con = new MySqlConnection( cs ) )
+            {
+                con.Open();
+
+                using( var cmd = con.CreateCommand() )
+                {
+                    cmd.CommandText = "update activity_log "
+                                    + "set day_name = @DN "
+                                    + "where user_id = @UID "
+                                    + "and id = @EID";
+
+                    // Protect against SQL Injection Attacks.
+                    cmd.Parameters.AddWithValue( "@DN",  entry.WeekdayID );
+                    cmd.Parameters.AddWithValue( "@UID", loggedIn.ID     );
+                    cmd.Parameters.AddWithValue( "@EID", entry.ID        );
+
+                    // We don't need rows back from this one.
+                    cmd.ExecuteNonQuery();
+
+                    // Let the user know the change succeeded.
+                    Console.WriteLine( $"Congratulations, {loggedIn.FirstName}...  The weekday is updated!" );
+                }
+            }
+        }
+
+        // Present the user with a menu of Categories with which
+        // the selected Activity Log Entry's Category can be set,
+        // updating the entry with the user's choice and the database.
+        private static void ChangeCategory( LogEntry entry )
+        {
+            // Clear the console for nicer output.
+            Console.Clear();
+
+            var catMenu = new SuperMenu( "With which Category would you like to update this entry?" );
+
+            // Load all the Dates into the Day Menu.
+            categories.Keys.ToList().ForEach( cat =>
+                catMenu.Add( new ActionOnlyOption(
+                    cat, () => { } ) ) );
+
+            // Get the user's new Category.
+            entry.CategoryID = categories[ catMenu.Run() ];
+
+            // Clear the console for nicer output.
+            Console.Clear();
+
+            // Update the user's information on the database.
+            using( var con = new MySqlConnection( cs ) )
+            {
+                con.Open();
+
+                using( var cmd = con.CreateCommand() )
+                {
+                    cmd.CommandText = "update activity_log "
+                                    + "set category_description = @CD "
+                                    + "where user_id = @UID "
+                                    + "and id = @EID";
+
+                    // Protect against SQL Injection Attacks.
+                    cmd.Parameters.AddWithValue( "@CD",  entry.CategoryID );
+                    cmd.Parameters.AddWithValue( "@UID", loggedIn.ID      );
+                    cmd.Parameters.AddWithValue( "@EID", entry.ID         );
+
+                    // We don't need rows back from this one.
+                    cmd.ExecuteNonQuery();
+
+                    // Let the user know the change succeeded.
+                    Console.WriteLine( $"Congratulations, {loggedIn.FirstName}...  The category is updated!" );
+                }
+            }
+        }
+
+        // Present the user with a menu of Activities with which
+        // the selected Activity Log Entry's Activity can be set,
+        // updating the entry with the user's choice and the database.
+        private static void ChangeActivity( LogEntry entry )
+        {
+            // Clear the console for nicer output.
+            Console.Clear();
+
+            var actMenu = new SuperMenu( "With which Category would you like to update this entry?" );
+
+            // Load all the Dates into the Day Menu.
+            activities.Keys.ToList().ForEach( act =>
+                actMenu.Add( new ActionOnlyOption(
+                    act, () => { } ) ) );
+
+            // Get the user's new Activity.
+            entry.ActivityID = activities[ actMenu.Run() ];
+
+            // Clear the console for nicer output.
+            Console.Clear();
+
+            // Update the user's information on the database.
+            using( var con = new MySqlConnection( cs ) )
+            {
+                con.Open();
+
+                using( var cmd = con.CreateCommand() )
+                {
+                    cmd.CommandText = "update activity_log "
+                                    + "set activity_description = @AD "
+                                    + "where user_id = @UID "
+                                    + "and id = @EID";
+
+                    // Protect against SQL Injection Attacks.
+                    cmd.Parameters.AddWithValue( "@AD",  entry.ActivityID );
+                    cmd.Parameters.AddWithValue( "@UID", loggedIn.ID      );
+                    cmd.Parameters.AddWithValue( "@EID", entry.ID         );
+
+                    // We don't need rows back from this one.
+                    cmd.ExecuteNonQuery();
+
+                    // Let the user know the change succeeded.
+                    Console.WriteLine( $"Congratulations, {loggedIn.FirstName}...  The activity is updated!" );
+                }
+            }
+        }
+
+        // Present the user with a menu of Durations with which
+        // the selected Activity Log Entry's Duration can be set,
+        // updating the entry with the user's choice and the database.
+        private static void ChangeDuration( LogEntry entry )
+        {
+            // Clear the console for nicer output.
+            Console.Clear();
+
+            var durMenu = new SuperMenu( "With which Duration would you like to update this entry?" );
+
+            // Load all the Dates into the Day Menu.
+            durations.Keys.ToList().ForEach( dur =>
+                durMenu.Add( new ActionOnlyOption(
+                    dur.ToString(), () => { } ) ) );
+
+            // Get the user's new Duration.
+            entry.DurationID = durations[ double.Parse( durMenu.Run() ) ];
+
+            // Clear the console for nicer output.
+            Console.Clear();
+
+            // Update the user's information on the database.
+            using( var con = new MySqlConnection( cs ) )
+            {
+                con.Open();
+
+                using( var cmd = con.CreateCommand() )
+                {
+                    cmd.CommandText = "update activity_log "
+                                    + "set time_spent_on_activity = @TS "
+                                    + "where user_id = @UID "
+                                    + "and id = @EID";
+
+                    // Protect against SQL Injection Attacks.
+                    cmd.Parameters.AddWithValue( "@TS",  entry.DurationID );
+                    cmd.Parameters.AddWithValue( "@UID", loggedIn.ID      );
+                    cmd.Parameters.AddWithValue( "@EID", entry.ID         );
+
+                    // We don't need rows back from this one.
+                    cmd.ExecuteNonQuery();
+
+                    // Let the user know the change succeeded.
+                    Console.WriteLine( $"Congratulations, {loggedIn.FirstName}...  The duration is updated!" );
+                }
+            }
+        }
+
+        // Delete the selected Activity Log Entry
+        private static void DeleteEntry( LogEntry entry )
+        {
+            // Clear the Console for nicer output.
+            Console.Clear();
+
+            // Confirm that the user wishes to delete the
+            // selected Activity Log Entry.
+            string sure = PromptFor< string >( "Are you SURE you want to delete this entry?\n"
+                                             + "This cannot be undone...\n"
+                                             + "Enter \"YES\" in all CAPS to confirm.\n"
+                                             , "Should never see this error prompt."
+                                             , any => true );
+
+            // Delete the Activity Log Entry if the
+            // user confirmed with resoundig YES.
+            if( sure == "YES" )
+            {
+                // Update the user's information on the database.
+                using( var con = new MySqlConnection( cs ) )
+                {
+                    con.Open();
+
+                    using( var cmd = con.CreateCommand() )
+                    {
+                        cmd.CommandText = "delete from activity_log "
+                                        + "where user_id = @UID "
+                                        + "and id = @EID";
+
+                        // Protect against SQL Injection Attacks.
+                        cmd.Parameters.AddWithValue( "@TS",  entry.DurationID );
+                        cmd.Parameters.AddWithValue( "@UID", loggedIn.ID      );
+                        cmd.Parameters.AddWithValue( "@EID", entry.ID         );
+
+                        // We don't need rows back from this one.
+                        cmd.ExecuteNonQuery();
+
+                        // Let the user know the delete succeeded.
+                        Console.WriteLine( $"Congratulations, {loggedIn.FirstName}...  The delete succeeded!" );
+
+                        loggedIn.Log.Remove( entry ); 
+                    }
+                }
+            }
+            else
+            {
+                // Let the user know the delete was canceled.
+                Console.WriteLine( "The delete was canceled.  Phew...  Close call!" );
+            }
+        }
+
+        // Adds a new, virtually empty Activity Log Entry for the
+        // user and situates him or her to edit it.
+        private static void AddEntry()
+        {
+            // Clear the Console for nicer output.
+            Console.Clear();
+
+            // Generate a new Activity Log ID.
+            var id = NextUserID();
+
+            // Write the new Activity Log Entry to the database.
+            using( var con = new MySqlConnection( cs ) )
+            {
+                con.Open();
+
+                using( var cmd = con.CreateCommand() )
+                {
+                    cmd.CommandText = "insert into activity_log"
+                                    + "( id"
+                                    + ", user_id ) "
+                                    + "values"
+                                    + "( @EID"
+                                    + ", @UID )";
+
+                    // Protect against SQL Injection Attacks.
+                    // Technically not neccessary here, but good habits..
+                    cmd.Parameters.AddWithValue( "@EID", id          );
+                    cmd.Parameters.AddWithValue( "@UID", loggedIn.ID );
+
+                    // We don't need rows back from this one.
+                    cmd.ExecuteNonQuery();
+
+                    // Let the user know the addition succeeded.
+                    Console.WriteLine( $"Congratulations, {loggedIn.FirstName}...  The new entry was added!\n"
+                                     + "You will now be sent to the screen to edit it." );
+
+                    // Keep the logged in user's log in sync with the database.
+                    var entry = new LogEntry();
+
+                    entry.ID     = id;
+                    entry.UserID = loggedIn.ID;
+
+                    loggedIn.Log.Add( entry );
+
+                    Pause();
+
+                    // Drop the user into editing the entry.
+                    LogEntry( entry );
+                }
+            }
+        }
+
+        // Finds the highest Activity Log ID Number
+        // and returns the next highest number.
+        private static int NextLogID()
+        {
+            using( var con = new MySqlConnection( cs ) )
+            {
+                con.Open();
+
+                using( var cmd = con.CreateCommand() )
+                {
+                    // Activity Log Entry IDs are unique across all users' entries.
+                    cmd.CommandText = "select max( id ) as ID from activity_log";
+
+                    using( MySqlDataReader rdr = cmd.ExecuteReader() )
+                    {
+                        if( rdr.HasRows )
+                        {
+                            // Still need this check in the case that
+                            // there are zero log entries in here.
+                            rdr.Read();
+
+                            return int.Parse( rdr[ "ID" ].ToString() ) + 1;
+                        }
+                        else
+                        {
+                            // The very first Activity Log Entry has an ID of 1.
+                            return 1;
+                        }
+                    }
+                }
+            }
         }
 
         // Program entry point.
