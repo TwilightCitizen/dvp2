@@ -13,57 +13,58 @@ namespace Postcard
     {
         #region Constants
 
-        private const string cs = "";
+        private const string cs = "server=192.168.121.1;"
+                                + "userid=dbremoteuser;"
+                                + "password=password;"
+                                + "database=Postcard;"
+                                + "port=8889";
 
         #endregion
 
-        #region General Module Variables
+        #region Aggregate Types
 
-        // The currently logged in user.
-        private static int? userLoggedIn = null;
-
-        // User other than logged in user.
-        private static int? userOther    = null;
+        // Details about a user.
+        private struct UserDetails {
+            public int    userID;
+            public string nameFirst;
+            public string nameLast;
+            public string nameUser;
+            public string password;
+            public bool   loggedIn;
+        }
 
         #endregion
 
-        #region Menus and Menu Options
+        #region Module-level State
 
-            #region Start Menu
+        // Don't want too much here.  The less, the better.
+        
 
-            private static MenuOption optLogin = new ActionOnlyOption(
+        #endregion
+
+        // Program entry point, essentially "Start".
+        public static void Main( string[] args ) {
+            var optLogin  = new ActionOnlyOption(
                 "Log Into Your Postcard Account"
             ,   Login
-            ,   conditions : new List< Func< bool > >() {
-                    () => userLoggedIn == null
-                }
             );
 
-            private static MenuOption optJoin  = new ActionOnlyOption(
+            var optJoin   = new ActionOnlyOption(
                 "Join Today! - Register a New Postcard Account"
             ,   Join
-            ,   conditions : new List< Func< bool > >() {
-                    () => userLoggedIn == null
-                }
             );
 
-            private static MenuOption optExit  = new ExitOption(
+            var optExit   = new ExitOption(
                 "Exit Postcard"
             );
 
-            private static SuperMenu menuStart = new SuperMenu(
+            var menuStart = new SuperMenu(
                 "This is Postcard!  Choose from below to get started."
             ,   "Oops!  That one isn't available.  Try again."
             ) {
                 optJoin, optLogin, optExit
             };
 
-            #endregion
-
-        #endregion
-
-        // Program entry point, essentially "Start".
-        public static void Main( string[] args ) {
             // Run start menu until user exits.
             while( true ) {
                 Console.Clear();
@@ -80,38 +81,117 @@ namespace Postcard
             Console.ReadKey();
         }
 
+        // Abstract !string.IsNullOrEmpty() since it appears in
+        // many PromptFor( string ) use cases.
+        private static bool NotEmpty( string any ) =>
+            !string.IsNullOrEmpty( any );
+
         // Login user, sending to welcome screen on success
         // and returning to start screen on failure.
         private static void Login() {
+            // userID for logged in user.
+            int?   userID;
+
             // Get the user's username and password.
             string username = GetUsername();
             string password = GetPassword();
 
             // Attempt to log the user in.
-            bool   matches  = false;
-
-            // TODO: Query database for matching UserID, toggling
-            //       matches accordingly.
+            bool   loggedIn = TryLogin( username, password, out userID );
 
             // Check if login succeeded, informing and diverting
             // the user accordinly.
-            if( matches ) {
+            if( loggedIn ) {
                 // Login succeeded.
-                // TODO: Query database to update logged in status.
-                Welcome();
+                MarkLoggedIn( userID.Value );
+                Welcome(      userID.Value );
             } else {
                 // Login failed.
                 Console.WriteLine( "Sorry!  That username or password didn't quite work." );
-                Pause();
             }
         }
 
-        private static string GetUsername() {
-            return "";
+        // Query for login returns a bool normally to signal success or
+        // failure and any matching userID through an out parameter.
+        private static bool TryLogin( string username, string password, out int? userID ) {
+            // Connect to the database.
+            using( var con = new MySqlConnection( cs ) ) {
+                con.Open();
+
+                // Issue a parameterized login query
+                using( var cmd = con.CreateCommand() ) {
+                    // Users where userID and password match user input.
+                    cmd.CommandText = "select userID               "
+                                    + "from   users                "
+                                    + "where  nameUser = @Username "
+                                    + "and    password = @Password ";
+
+                    // Parameterize to avoid SQL injection.
+                    cmd.Parameters.AddWithValue( "@Username", username );
+                    cmd.Parameters.AddWithValue( "@Password", password );
+
+                    // Execute the query.
+                    using( MySqlDataReader rdr = cmd.ExecuteReader() ) {
+                        // Check the results.
+                        if( rdr.HasRows ) {
+                            // Login was successfull.
+                            rdr.Read();
+
+                            // Return the userID with success.
+                            userID = int.Parse( rdr[ "userID" ].ToString() );
+
+                            return true;
+                        } else {
+                            // Login was unsuccessfull.
+                            // Return null with failure.
+                            userID = null;
+
+                            return false;
+                        }
+                    }
+                }
+            }
         }
 
+        // Query to mark the logged in user as logged in so other
+        // users on the application can see how many others are on.
+        private static void MarkLoggedIn( int userID ) {
+            // Connect to the database.
+            using( var con = new MySqlConnection( cs ) ) {
+                con.Open();
+
+                // Issue a query to mark the user as logged in.
+                using( var cmd = con.CreateCommand() ) {
+                    // Logged in is true for matching userID
+                    cmd.CommandText = "update users              "
+                                    + "set    loggedIn = 1       "
+                                    + "where  userID   = @UserID ";
+
+                    // Parameterize to avoid SQL injection.
+                    cmd.Parameters.AddWithValue( "@UserID", userID );
+
+                    // Execute the query.
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        // Get the user's username.
+        private static string GetUsername() {
+            return PromptFor< string >(
+                "What is your username?"
+            ,   "Oops!  Looks like you entered a blank username.  Try again."
+            ,   any => NotEmpty( any )
+            );
+        }
+
+        // Get the user's password.
         private static string GetPassword() {
-            return "";
+            return PromptFor< string > (
+                "What is your password?"
+            ,   "Hmm...  Blank passwords don't work.  Try again."
+            ,   any => NotEmpty( any )
+            );
         }
 
         // Register a new account for the user, if possible,
@@ -154,8 +234,72 @@ namespace Postcard
             return "";
         }
 
-        private static void Welcome() {
+        // Welcome the user and present the user with
+        // a main menu.
+        private static void Welcome( int userID ) {
+            // Get the logged in user's details.
+            UserDetails? details;
 
+            // Logged in user should not fail
+            bool gotDetails = TryGetUserDetails( userID, out details );
+
+            // Check if details were found, prompting and diverting
+            // the user accordingly.
+            if( gotDetails) {
+                // Issue welcome message.
+                Console.WriteLine( $"Welcome to Postcard, { details.Value.nameFirst }!" );
+            } else {
+                // Something bad must have happened.
+                Console.WriteLine( "Ut, oh...  Something went wrong!" );
+                Pause();
+            }
+        }
+
+        // Query user details from database with userID.
+        private static bool TryGetUserDetails( int userID, out UserDetails? details ) {
+
+            // Connect to the database.
+            using( var con = new MySqlConnection( cs ) ) {
+                con.Open();
+
+                // Issue a parameterized query for user details.
+                using( var cmd = con.CreateCommand() ) {
+                    // User where userID matches.
+                    cmd.CommandText = "select *              "
+                                    + "from users            "
+                                    + "where userID = @UserID";
+
+                    // Parameterize to avoid SQL injection.
+                    cmd.Parameters.AddWithValue( "@UserID", userID );
+
+                    // Execute the query.
+                    using( MySqlDataReader rdr = cmd.ExecuteReader() ) {
+                        // Check the results.
+                        if( rdr.HasRows ) {
+                            // User was found.
+                            rdr.Read();
+
+                            // Return the user details with success.
+                            details = new UserDetails {
+                                userID    = int.Parse(  rdr[ "userID"    ].ToString() )
+                            ,   nameFirst =             rdr[ "nameFirst" ].ToString()
+                            ,   nameLast  =             rdr[ "nameLast"  ].ToString()
+                            ,   nameUser  =             rdr[ "nameUser"  ].ToString()
+                            ,   password  =             rdr[ "password"  ].ToString()
+                            ,   loggedIn  = bool.Parse( rdr[ "loggedIn"  ].ToString() )
+                            };
+
+                            return true;
+                        } else {
+                            // Login was unsuccessfull.
+                            // Return null with failure.
+                            details = null;
+
+                            return false;
+                        }
+                    }
+                }
+            }
         }
 
         private static void Logout() {
