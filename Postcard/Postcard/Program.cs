@@ -35,15 +35,9 @@ namespace Postcard
 
         #endregion
 
-        #region Module-level State
-
-        // Don't want too much here.  The less, the better.
-        
-
-        #endregion
-
         // Program entry point, essentially "Start".
         public static void Main( string[] args ) {
+            // Options for start menu.
             var optLogin  = new ActionOnlyOption(
                 "Log Into Your Postcard Account"
             ,   Login
@@ -58,6 +52,7 @@ namespace Postcard
                 "Exit Postcard"
             );
 
+            // Start menu.
             var menuStart = new SuperMenu(
                 "This is Postcard!  Choose from below to get started."
             ,   "Oops!  That one isn't available.  Try again."
@@ -90,21 +85,20 @@ namespace Postcard
         // and returning to start screen on failure.
         private static void Login() {
             // userID for logged in user.
-            int?   userID;
+            int? userID = null;
 
             // Get the user's username and password.
             string username = GetUsername();
+            Console.Clear();
             string password = GetPassword();
+            Console.Clear();
 
-            // Attempt to log the user in.
-            bool   loggedIn = TryLogin( username, password, out userID );
-
-            // Check if login succeeded, informing and diverting
-            // the user accordinly.
-            if( loggedIn ) {
+            // Check if login and marking the user as logged in succeeded,
+            // informing and diverting the user accordinly.
+            if( TryLogin( username, password, out userID ) &&
+                TryMarkLoggedIn( userID.Value ) ) {
                 // Login succeeded.
-                MarkLoggedIn( userID.Value );
-                Welcome(      userID.Value );
+                Welcome( userID.Value );
             } else {
                 // Login failed.
                 Console.WriteLine( "Sorry!  That username or password didn't quite work." );
@@ -155,7 +149,7 @@ namespace Postcard
 
         // Query to mark the logged in user as logged in so other
         // users on the application can see how many others are on.
-        private static void MarkLoggedIn( int userID ) {
+        private static bool TryMarkLoggedIn( int userID ) {
             // Connect to the database.
             using( var con = new MySqlConnection( cs ) ) {
                 con.Open();
@@ -170,8 +164,8 @@ namespace Postcard
                     // Parameterize to avoid SQL injection.
                     cmd.Parameters.AddWithValue( "@UserID", userID );
 
-                    // Execute the query.
-                    cmd.ExecuteNonQuery();
+                    // Execute the query, returning success/failure.
+                    return cmd.ExecuteNonQuery() == 1;
                 }
             }
         }
@@ -199,55 +193,224 @@ namespace Postcard
         // and on failure, giving them the option to try again
         // or cancel.
         private static void Join() {
-            string     username = null;
-            bool       exists   = true;
-            MenuOption choice   = null;
+            // Options for existing username menu.
+            var optAgain   = new ActionOnlyOption(
+                "Try a Different Username"
+            ,   () => { }
+            );
 
-            // Get a new username from the user until its
-            // one that isn't taken, or the user stops trying.
-            while( exists && !( choice is CancelOption ) ) {
+            var optCancel  = new CancelOption(
+                "Cancel Registration"
+            );
+
+            // Existing username menu.
+            var menuExists = new SuperMenu(
+                "Oh, no!  It looks like someone already has that username.\n"
+            +   "What would you like to do?"
+            ,   "Oops!  Can't do that here.  Try again."
+            ) {
+                optAgain, optCancel
+            };
+
+            string     username = null; // Desired username.
+            bool       exists   = true; // Hold existence.
+            MenuOption choice   = null; // Catch user's choice
+
+            // Get the user's desired username.  Keep trying
+            // until a unique one is provided or the user quits trying
+            while( exists ) {
                 username = GetNewUsername();
+                exists   = UsernameExists( username );
+                
+                // Give the user the option to keep trying if it does.
+                if( exists ) choice = menuExists.Run();
 
-                // TODO: Query database for matching username
-                //       toggling exists accordingly.
-                //       See if the user wants to try again
-                //       if it exists, or give up.
+                // Handle the user giving up gracefully.
+                if( choice == optCancel ) {
+                    // Entreat the user to try again later.
+                    Console.WriteLine(
+                        "Sorry to see you go so soon!\n"
+                    +   "Hopefully, you'll come back to try registering again later."
+                    );
+
+                    return;
+                }
             }
 
-            // Did the user quit trying?
+            // Get the rest of the user's details.
+            var details   = new UserDetails {
+                nameUser  = username
+            };
 
+            Console.Clear();
+            details.password  = GetNewPassword();
+            Console.Clear();
+            details.nameFirst = GetNewFirstName();
+            Console.Clear();
+            details.nameLast  = GetNewLastName();
+            Console.Clear();
+            details.loggedIn  = false;
+            Console.Clear();
+
+            // Show the user the registration details with a 
+            // note that they can be changed later.
+            Console.WriteLine(
+                 "Here are the details you entered.\n"
+            +   $"Username   - {details.nameUser}\n"
+            +   $"Password   - {details.password}\n"
+            +   $"First Name - {details.nameFirst}\n"
+            +   $"Last Name  - {details.nameLast}\n\n"
+            +    "If something looks wrong, don't worry...\n"
+            +    "You can change any of it later after logging in.\n\n"
+            );
+
+            // Attempt to register the account, informing the user.
+            if( TryRegistration( details ) ) {
+                // Registration succeeded.
+                Console.WriteLine( 
+                    $"Congratulations, {details.nameFirst}!  Your account is registered with Postcard.\n"
+                +   "You can now login from the start screen."
+                );
+            } else {
+                // Registration failed.
+                Console.WriteLine(
+                    "Oh, no...  Something went wrong with your registration!"
+                +   "Please check your connection and try again later.  Sorry about this."
+                );
+            }
         }
 
+        // Query to add user details to users and report success/failure.
+        private static bool TryRegistration( UserDetails details ) {
+            // Connect to the database.
+            using( var con = new MySqlConnection( cs ) ) {
+                con.Open();
+
+                // Issue a query to add the user.
+                using( var cmd = con.CreateCommand() ) {
+                    // Insert all the details.  UserID generated automatically.
+                    cmd.CommandText = "insert into users( "
+                                    + "  nameUser         "
+                                    + ", password         "
+                                    + ", nameFirst        "
+                                    + ", nameLast         "
+                                    + ", loggedIn )       "
+                                    + "values(            "
+                                    + "  @Username        "
+                                    + ", @Password        "
+                                    + ", @FirstName       "
+                                    + ", @LastName        "
+                                    + ", @LoggedIn )      ";
+
+                    // Parameterize to avoid SQL injection.
+                    cmd.Parameters.AddWithValue( "@Username",  details.nameUser  );
+                    cmd.Parameters.AddWithValue( "@Password",  details.password  );
+                    cmd.Parameters.AddWithValue( "@FirstName", details.nameFirst );
+                    cmd.Parameters.AddWithValue( "@LastName",  details.nameLast  );
+                    cmd.Parameters.AddWithValue( "@LoggedIn",  details.loggedIn  );
+
+                    // Execute the query.
+                    return cmd.ExecuteNonQuery() == 1;
+                }
+            }
+        }
+
+        // Query to see if a username already exists in the database.
+        private static bool UsernameExists( string username ) {
+            // Connect to the database.
+            using( var con = new MySqlConnection( cs ) ) {
+                con.Open();
+
+                // Issue a query to find the username.
+                using( var cmd = con.CreateCommand() ) {
+                    // Logged in is true for matching userID
+                    cmd.CommandText = "select nameUser             "
+                                    + "from   users                "
+                                    + "where  nameUser = @Username ";
+
+                    // Parameterize to avoid SQL injection.
+                    cmd.Parameters.AddWithValue( "@Username", username );
+
+                    // Execute the query and return the status.
+                    return cmd.ExecuteReader().HasRows;
+                }
+            }
+        }
+
+        // Gets the desired username from the user.
         private static string GetNewUsername() {
-            return "";
+            return PromptFor< string >(
+                "What username would you like?  You'll need it to login."
+            ,   "Oops!  Looks like you entered a blank username.  Try again."
+            ,   any => NotEmpty( any )
+            );
         }
 
         private static string GetNewPassword() {
-            return "";
+            return PromptFor< string >(
+                "What password would you like?  Choose something easy to\n"
+            +   "remember, but hard to guess.  You'll need it to login."
+            ,   "Oops!  Looks like you entered a blank password.  Try again."
+            ,   any => NotEmpty( any )
+            );
         }
 
         private static string GetNewFirstName() {
-            return "";
+            return PromptFor< string >(
+                "What is your first name?"
+            ,   "Oops!  Looks like you entered a blank first name.  Try again."
+            ,   any => NotEmpty( any )
+            );
         }
 
         private static string GetNewLastName() {
-            return "";
+            return PromptFor< string >(
+                "What is your last name?"
+            ,   "Oops!  Looks like you entered a blank last name.  Try again."
+            ,   any => NotEmpty( any )
+            );
         }
 
         // Welcome the user and present the user with
         // a main menu.
         private static void Welcome( int userID ) {
+            // Options for welcome menu.
+            var optProfile   = new ActionOnlyOption(
+                "View & Edit Your Profile"
+            ,   Profile
+            );
+
+            var optUsers     = new ActionOnlyOption(
+                "Read Your Postcards"
+            ,   Postcards
+            );
+
+            var optLogout    = new ActionOnlyOption(
+                "Logout of Your Postcard Account"
+            ,   () => Logout( userID )
+            );
+
+            // Welcome menu.
+            var menuWelcome = new SuperMenu(
+                error : "Oops!  That one isn't available.  Try again."
+            ) {
+                optProfile, optUsers, optLogout
+            };
+
             // Get the logged in user's details.
             UserDetails? details;
 
-            // Logged in user should not fail
-            bool gotDetails = TryGetUserDetails( userID, out details );
-
             // Check if details were found, prompting and diverting
             // the user accordingly.
-            if( gotDetails) {
-                // Issue welcome message.
-                Console.WriteLine( $"Welcome to Postcard, { details.Value.nameFirst }!" );
+            if( TryGetUserDetails( userID, out details ) ) {
+                menuWelcome.Prompt = $"You are logged in, { details.Value.nameFirst }. "
+                                   +  "What would you like to do now?";
+
+                // Run the welcome menu until the user logs out.
+                while( menuWelcome.Run() != optLogout ) {
+                    Pause();
+                    Console.Clear();
+                }
             } else {
                 // Something bad must have happened.
                 Console.WriteLine( "Ut, oh...  Something went wrong!" );
@@ -302,8 +465,67 @@ namespace Postcard
             }
         }
 
-        private static void Logout() {
+        // On confirmation, log the user out.
+        private static void Logout( int userID ) {
+            // Make sure the user really wants to logout.
+            if( Confirmed( "Are you sure you want to logout of Postcard?" ) ) {
+                // Get the logged in user's details.
+                UserDetails? details;
+                string       name = "";
 
+                // Customize farewell, if possible.
+                if( TryGetUserDetails( userID, out details ) ) {
+                    name = ", " + details.Value.nameFirst;
+                }
+
+                // Let the user know logout succeeded.  It can't fail because userID
+                // goes out of scope when the login scope exits back to the start menu.
+                Console.Clear();
+                Console.WriteLine( "You've been logged out.  Come back soon{0}!", name );
+
+                // Check if the user can be marked logged out, informing
+                // the user accordingly.
+                if( !TryMarkLoggedOut( userID ) ) {
+                    // Marking as logged out failed somehow.
+                    Console.WriteLine( "You may still appear as online to other users." );
+                }
+            }
+        }
+
+        // Query to mark the logged in user as logged out.
+        private static bool TryMarkLoggedOut( int userID ) {
+            // Connect to the database.
+            using( var con = new MySqlConnection( cs ) ) {
+                con.Open();
+
+                // Issue a query to mark the user as logged out.
+                using( var cmd = con.CreateCommand() ) {
+                    // Logged in is false for matching userID
+                    cmd.CommandText = "update users              "
+                                    + "set    loggedIn = 0       "
+                                    + "where  userID   = @UserID ";
+
+                    // Parameterize to avoid SQL injection.
+                    cmd.Parameters.AddWithValue( "@UserID", userID );
+
+                    // Execute the query.
+                    if( cmd.ExecuteNonQuery() == 1) {
+                        // Success means a row got updated.
+                        return true;
+                    } else {
+                        // Anything else means something went wrong.
+                        return false;
+                    };
+                }
+            }
+        }
+
+        // Prompts the user to confirm some action.
+        private static bool Confirmed( string prompt ) {
+            return PromptFor< string >(
+                prompt + "\nEnter \"YES\" in all caps to confirm."
+            , "", any => true
+            ) == "YES";
         }
 
         private static void Profile() {
