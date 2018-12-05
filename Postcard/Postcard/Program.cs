@@ -116,7 +116,7 @@ namespace Postcard
                 using( var cmd = con.CreateCommand() ) {
                     // Users where userID and password match user input.
                     cmd.CommandText = "select userID               "
-                                    + "from   users                "
+                                    + "from   Users                "
                                     + "where  nameUser = @Username "
                                     + "and    password = @Password ";
 
@@ -325,7 +325,7 @@ namespace Postcard
                 using( var cmd = con.CreateCommand() ) {
                     // Logged in is true for matching userID
                     cmd.CommandText = "select nameUser             "
-                                    + "from   users                "
+                                    + "from   Users                "
                                     + "where  nameUser = @Username ";
 
                     // Parameterize to avoid SQL injection.
@@ -403,18 +403,124 @@ namespace Postcard
             // Check if details were found, prompting and diverting
             // the user accordingly.
             if( TryGetUserDetails( userID, out details ) ) {
-                menuWelcome.Prompt = $"You are logged in, { details.Value.nameFirst }. "
-                                   +  "What would you like to do now?";
+                MenuOption choice = null; // Catch user's choice.
+                int?       online = null; // Number of users online.
+                int?       unread = null; // Number of user's unread postcards.
+                string     prompt = null; // For building menu prompt.
 
                 // Run the welcome menu until the user logs out.
-                while( menuWelcome.Run() != optLogout ) {
-                    Pause();
-                    Console.Clear();
-                }
+                while( choice != optLogout ) {
+                    prompt = $"Welcome, { details.Value.nameFirst }!";
+
+                    // Get the number of user's online.
+                    if( TryGetUsersOnline( out online ) ) {
+                        online -= 1;
+                        prompt += string.Format(
+                            "\n\nThere {0} online right now."
+                        ,   online == 0 ? "are no other users"
+                                        : online == 1 ? "is 1 other user" 
+                                                      : $"are { online } other users"
+                        );
+                    }
+
+                    // Get the number of user's unread postcards.
+                    if( TryGetUnreadPostcards( userID, out unread ) ) {
+                        prompt += string.Format( 
+                            "\nAlso, you have {0}."
+                        ,   unread == 0 ? "no unread postcards"
+                                        : unread == 1 ? "1 unread postcard"
+                                                      : $"{ unread } unread postcards"
+                        );
+                    }
+
+                    menuWelcome.Prompt = prompt + "\n\nWhat would you like to do now?";
+                    choice             = menuWelcome.Run();
+
+                    // Don't pause twice on logout.
+                    if( choice != optLogout ) Pause();
+                };
             } else {
                 // Something bad must have happened.
                 Console.WriteLine( "Ut, oh...  Something went wrong!" );
                 Pause();
+            }
+        }
+
+        private static bool TryGetUnreadPostcards( int userID, out int? count ) {
+            // Connect to the database.
+            using( var con = new MySqlConnection( cs ) ) {
+                con.Open();
+
+                // Issue a query for user's unread postcards.
+                using( var cmd = con.CreateCommand() ) {
+                    // Count of postcards where toID matches userID and
+                    // userID isn't a reader for it.
+                    cmd.CommandText = "select count( P.cardID ) as unread    "
+                                    + "from   PostCards as P                 "
+                                    + "where  P.toID = @UserID               "
+                                    + "and    not exists(                    "
+                                    + "         select null                  "
+                                    + "         from   Readers as R          "
+                                    + "         where  R.userID = P.toID     "
+                                    + "         and    R.cardID = P.cardID ) ";
+
+                    // Parameterize to avoid SQL injection.
+                    cmd.Parameters.AddWithValue( "@UserID", userID );
+
+                    // Execute the query.
+                    using( MySqlDataReader rdr = cmd.ExecuteReader() ) {
+                        // Check the results.
+                        if( rdr.HasRows ) {
+                            // We got a number back.
+                            rdr.Read();
+
+                            // Return the number of unread postcards with success.
+                            count = int.Parse( rdr[ "unread" ].ToString() );
+
+                            return true;
+                        } else {
+                            // Return 0 with failure.
+                            count = null;
+
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Query how many users are online right now.
+        private static bool TryGetUsersOnline( out int? count ) {
+            // Connect to the database.
+            using( var con = new MySqlConnection( cs ) ) {
+                con.Open();
+
+                // Issue a query for online users.
+                using( var cmd = con.CreateCommand() ) {
+                    // Count of users where loggedIn is true.
+                    cmd.CommandText = "select count( userID ) as online "
+                                    + "from  Users                      "
+                                    + "where loggedIn = 1               ";
+
+                    // Execute the query.
+                    using( MySqlDataReader rdr = cmd.ExecuteReader() ) {
+                        // Check the results.
+                        if( rdr.HasRows ) {
+                            // We got a number back.
+                            rdr.Read();
+
+                            // Return the number of online users with success.
+                            count = int.Parse( rdr[ "online" ].ToString() );
+
+                            return true;
+                        } else {
+                            // Return 0 with failure.
+                            count = null;
+
+                            return false;
+                        }
+                    }
+                }
             }
         }
 
@@ -429,7 +535,7 @@ namespace Postcard
                 using( var cmd = con.CreateCommand() ) {
                     // User where userID matches.
                     cmd.CommandText = "select *              "
-                                    + "from users            "
+                                    + "from Users            "
                                     + "where userID = @UserID";
 
                     // Parameterize to avoid SQL injection.
