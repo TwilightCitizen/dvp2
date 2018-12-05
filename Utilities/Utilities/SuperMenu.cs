@@ -5,7 +5,7 @@ using Utilities.General;
 
 namespace Utilities.Terminal
 {
-    public class SuperMenu : List< MenuOption >, IRun< string >, IDisplay
+    public class SuperMenu : List< MenuOption >, IRun< MenuOption >, IDisplay
     {
         	public string Prompt { get; set; }
 		public string Error  { get; set; }
@@ -142,7 +142,7 @@ namespace Utilities.Terminal
             return chunksInOption.Except( existingLetters )?.FirstOrDefault() ?? null;
         }
 
-        public string Run()
+        public MenuOption Run()
         {
             string     input;
             MenuOption menuOption;
@@ -161,7 +161,7 @@ namespace Utilities.Terminal
             Console.Clear();
 
             if( menuOption?.Run() ?? false )
-                return menuOption.Text;
+                return menuOption;
             else
             {
                 Console.WriteLine( Error );

@@ -4,3 +4,9 @@ C:\Users\David Clark\source\repos\Utilities\Utilities\obj\Debug\Utilities.csproj
 C:\Users\David Clark\source\repos\Utilities\Utilities\obj\Debug\Utilities.csproj.CoreCompileInputs.cache
 C:\Users\David Clark\source\repos\Utilities\Utilities\obj\Debug\Utilities.dll
 C:\Users\David Clark\source\repos\Utilities\Utilities\obj\Debug\Utilities.pdb
+\\vmware-host\Shared Folders\Desktop\dvp2\Utilities\Utilities\obj\Debug\Utilities.csprojAssemblyReference.cache
+\\vmware-host\Shared Folders\Desktop\dvp2\Utilities\Utilities\obj\Debug\Utilities.csproj.CoreCompileInputs.cache
+\\vmware-host\Shared Folders\Desktop\dvp2\Utilities\Utilities\obj\Debug\Utilities.dll
+\\vmware-host\Shared Folders\Desktop\dvp2\Utilities\Utilities\obj\Debug\Utilities.pdb
+\\vmware-host\Shared Folders\Desktop\dvp2\Utilities\Utilities\bin\Debug\Utilities.dll
+\\vmware-host\Shared Folders\Desktop\dvp2\Utilities\Utilities\bin\Debug\Utilities.pdb
