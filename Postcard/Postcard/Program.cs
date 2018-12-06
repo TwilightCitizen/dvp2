@@ -385,7 +385,7 @@ namespace Postcard
 
             var optUsers     = new ActionOnlyOption(
                 "Browse Other Users"
-            ,   Users
+            ,   () => Users( userID )
             );
 
             var optLogout    = new ActionOnlyOption(
@@ -645,26 +645,26 @@ namespace Postcard
         // menu for editing the user's own or writing to another's.
         private static void ProfileOwn( int userID ) {
             // Get the logged in user's details.
-            UserDetails details = new UserDetails { };
+            var details = new UserDetails { };
 
             // Options for profile menu.
             var optUsername     = new ActionOnlyOption(
-                "Edit Your Username"
+                "Change Your Username"
             ,   () => Username(  ref details ) 
             );
 
             var optPassword     = new ActionOnlyOption(
-                "Edit Your Password"
+                "Change Your Password"
             ,   () => Password(  ref details ) 
             );
 
             var optFirstName    = new ActionOnlyOption(
-                "Edit Your First Name"
+                "Change Your First Name"
             ,   () => FirstName( ref details ) 
             );
 
             var optLastName     = new ActionOnlyOption(
-                "Edit Your Last Name"
+                "Change Your Last Name"
             ,   () => LastName(  ref details ) 
             );
 
@@ -949,12 +949,145 @@ namespace Postcard
 
         }
 
-        private static void Users() {
+        // Prompt the user with a menu of user profiles other
+        // than the user if there are any.  If not, divert the
+        // user accordingly.
+        private static void Users( int userID ) {
+            // Other user menu options.
+            var optCancel = new CancelOption(
+                "Nevermind - Go Back"
+            );
 
+            // Other user menu.
+            var menuOthers = new SuperMenu(
+                "Which user's profile do you want to check out?"
+            );
+
+            
+            var        others = new List< UserDetails >(); // Other user's details.
+            MenuOption choice = null;
+
+            // Attempt to get the other users' details.
+            if( TryGetOthersDetails( userID, out others ) ) {
+                // There are other users and/or no connectivity issues.
+                others.ForEach( details =>
+                    menuOthers.Add( new ActionOnlyOption( 
+                        details.nameUser
+                    +   ( details.loggedIn ? " - Online Now!" : "" )
+                    ,   () => ProfileOther( userID, details )
+                    ) )
+                );
+
+                menuOthers.Add( optCancel );
+
+                // Run the menu until the user is done.
+                while( choice != optCancel ) {
+                    choice = menuOthers.Run();
+
+                    // Don't pause twice on logout.
+                    if( choice != optCancel ) Pause();
+                }
+
+            } else {
+                Console.WriteLine(
+                    "Hmmm...  There doesn't appear to be any other users.\n"
+                +   "Also, check your connection and try again.  That could be the problem."
+                );
+            }
         }
 
-        private static void Write() {
+        // Query for all users details, other than the logged in user.
+        private static bool TryGetOthersDetails( int userID, out List< UserDetails > others ) {
+            // Other users' details.
+            var users = new List< UserDetails >();
 
+            // Connect to the database.
+            using( var con = new MySqlConnection( cs ) ) {
+                con.Open();
+
+                // Issue a parameterized query of user's details.
+                using( var cmd = con.CreateCommand() ) {
+                    // Users where userID do not match userID.
+                    cmd.CommandText = "select *                 "
+                                    + "from   Users             "
+                                    + "where  userID <> @UserID ";
+
+                    // Parameterize to avoid SQL injection.
+                    cmd.Parameters.AddWithValue( "@UserID", userID );
+
+                    // Execute the query.
+                    using( MySqlDataReader rdr = cmd.ExecuteReader() ) {
+                        // Check the results.
+                        if( rdr.HasRows ) {
+                            // We have other users
+                            while( rdr.Read() ) {
+                                // Add user's details to list.
+                                users.Add( new UserDetails {
+                                    userID    = int.Parse(  rdr[ "userID"    ].ToString() )
+                                ,   nameUser  =             rdr[ "nameUser"  ].ToString()
+                                ,   nameFirst =             rdr[ "nameFirst" ].ToString()
+                                ,   nameLast  =             rdr[ "nameLast"  ].ToString()
+                                ,   loggedIn  = bool.Parse( rdr[ "loggedIn"  ].ToString() )
+                                ,   password  = ""
+                                } );
+                            }
+
+                            // Return the users' details with success.
+                            others = users;
+
+                            return true;
+                        } else {
+                            // Return empty with failure.
+                            others = users;
+
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Display the selected user's profile with options to
+        // send the user a postcard or go back.
+        private static void ProfileOther( int userID, UserDetails details ) {
+            // Options for profile menu.
+            var optWrite    = new ActionOnlyOption(
+                $"Send { details.nameUser } a Postcard!"
+            ,   () => Write( userID, details )
+            );
+
+            var optDone     = new CancelOption(
+                "Done - Go Back to the Last Screen"
+            );
+
+            // Profile menu.
+            var menuProfile = new SuperMenu(
+                error : "Oops!  That one isn't available.  Try again."
+            ) {
+                optWrite, optDone
+            };
+
+
+            MenuOption choice = null; // Catch user's choice.
+            string     prompt = null; // For building menu prompt.
+
+            // Run the welcome menu until the user logs out.
+            while( choice != optDone ) {
+                prompt = $"Here { details.nameUser }'s profile.\n\n"
+                        +   $"- Username:   { details.nameUser  }\n"
+                        +   $"- First Name: { details.nameFirst }\n"
+                        +   $"- Last Name:  { details.nameLast  }\n\n";
+
+                menuProfile.Prompt = prompt + "What would you like to do now?";
+                choice             = menuProfile.Run();
+
+                // Don't pause twice on exit.
+                if( choice != optDone ) Pause();
+            };
+        }
+
+        private static void Write( int userID, UserDetails details ) {
+            Console.WriteLine( "Writing ");
         }
     }
 }
