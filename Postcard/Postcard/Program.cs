@@ -31,6 +31,15 @@ namespace Postcard
             public bool   loggedIn;
         }
 
+        // Details about a postcard.
+        private struct CardDetails {
+            public int      cardID;
+            public int      fromID;
+            public int      toID;
+            public DateTime date;
+            public string   message;
+        }
+
         #endregion
 
         // Program entry point, essentially "Start".
@@ -1086,8 +1095,58 @@ namespace Postcard
             };
         }
 
+        // Prompt the user for a postcard message to send to the selected user.
+        // Long-form user-entry in the console is problematic, at best, so
+        // give the user a chance to review and send the message, or cancel
+        // sending the postcard with confirmation.
         private static void Write( int userID, UserDetails details ) {
-            Console.WriteLine( "Writing ");
+            // Write menu options.
+            var optSend = new ActionOnlyOption(
+                $"Send Your Postcard to { details.nameUser } Now!"
+            ,   () => { }
+            );
+
+            var optEdit = new ActionOnlyOption(
+                "Change Your Postcard's Message"
+            ,   () => { }
+            );
+
+            var optDiscard = new CancelOption(
+                $"Discard Your Postcard to { details.nameUser } and Go Back"
+            );
+
+            // Write menu.
+            var menuWrite  = new SuperMenu(
+                error : "That's not in the menu!  Try again."
+            );
+
+            // Get message to put on postcard to selected user.
+            string message = GetNewMessage( details.nameUser );
+
+            MenuOption choice = null; // Catch the user's choice.
+
+            // TODO: Pick up where we left off here.
+
+            // The whole postcard.
+            var postcard = new CardDetails {
+                fromID   = userID
+            ,   toID     = details.userID
+            ,   date     = DateTime.Today
+            ,   message  = message
+            };
+        }
+
+        // Prompt user for message to send to selected user.
+        private static string GetNewMessage( string username ) {
+            return PromptFor< string >
+            (
+                $"What is your postcard's message to { username }?\n"
+            +   "Make sure it isn't empty or over 1,024 characters."
+            +   "Keep in mind that hitting <Enter> finishes the message,"
+            +   "so don't try to separate paragraphs with blank lines."
+            ,   "Oops... That was too long or too short.  Can't send that!  Try again."
+            ,   any => !string.IsNullOrEmpty( any ) && any.Length <= 1024
+            );
         }
     }
 }
