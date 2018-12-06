@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using MySql.Data.MySqlClient;
 using Utilities.Terminal;
 using static Utilities.Terminal.IO;
@@ -85,7 +83,7 @@ namespace Postcard
         // and returning to start screen on failure.
         private static void Login() {
             // userID for logged in user.
-            int? userID = null;
+            int userID = 0;
 
             // Get the user's username and password.
             string username = GetUsername();
@@ -96,9 +94,9 @@ namespace Postcard
             // Check if login and marking the user as logged in succeeded,
             // informing and diverting the user accordinly.
             if( TryLogin( username, password, out userID ) &&
-                TryMarkLoggedIn( userID.Value ) ) {
+                TryMarkLoggedIn( userID ) ) {
                 // Login succeeded.
-                Welcome( userID.Value );
+                Welcome( userID );
             } else {
                 // Login failed.
                 Console.WriteLine( "Sorry!  That username or password didn't quite work." );
@@ -107,7 +105,7 @@ namespace Postcard
 
         // Query for login returns a bool normally to signal success or
         // failure and any matching userID through an out parameter.
-        private static bool TryLogin( string username, string password, out int? userID ) {
+        private static bool TryLogin( string username, string password, out int userID ) {
             // Connect to the database.
             using( var con = new MySqlConnection( cs ) ) {
                 con.Open();
@@ -138,7 +136,7 @@ namespace Postcard
                         } else {
                             // Login was unsuccessfull.
                             // Return null with failure.
-                            userID = null;
+                            userID = 0;
 
                             return false;
                         }
@@ -255,11 +253,11 @@ namespace Postcard
             // Show the user the registration details with a 
             // note that they can be changed later.
             Console.WriteLine(
-                 "Here are the details you entered.\n"
-            +   $"Username   - {details.nameUser}\n"
-            +   $"Password   - {details.password}\n"
-            +   $"First Name - {details.nameFirst}\n"
-            +   $"Last Name  - {details.nameLast}\n\n"
+                 "Here are the details you entered.\n\n"
+            +   $"- Username:   { details.nameUser  }\n"
+            +   $"- Password:   { details.password  }\n"
+            +   $"- First Name: { details.nameFirst }\n"
+            +   $"- Last Name:  { details.nameLast  }\n\n"
             +    "If something looks wrong, don't worry...\n"
             +    "You can change any of it later after logging in.\n\n"
             );
@@ -274,7 +272,7 @@ namespace Postcard
             } else {
                 // Registration failed.
                 Console.WriteLine(
-                    "Oh, no...  Something went wrong with your registration!"
+                    "Oh, no...  Something went wrong with your registration!\n"
                 +   "Please check your connection and try again later.  Sorry about this."
                 );
             }
@@ -377,12 +375,17 @@ namespace Postcard
             // Options for welcome menu.
             var optProfile   = new ActionOnlyOption(
                 "View & Edit Your Profile"
-            ,   Profile
+            ,   () => ProfileOwn( userID )
+            );
+
+            var optRead      = new ActionOnlyOption(
+                "Read Your Postcards"
+            ,   Postcards
             );
 
             var optUsers     = new ActionOnlyOption(
-                "Read Your Postcards"
-            ,   Postcards
+                "Browse Other Users"
+            ,   Users
             );
 
             var optLogout    = new ActionOnlyOption(
@@ -394,23 +397,23 @@ namespace Postcard
             var menuWelcome = new SuperMenu(
                 error : "Oops!  That one isn't available.  Try again."
             ) {
-                optProfile, optUsers, optLogout
+                optProfile, optRead, optUsers, optLogout
             };
 
             // Get the logged in user's details.
-            UserDetails? details;
+            UserDetails details;
 
             // Check if details were found, prompting and diverting
             // the user accordingly.
             if( TryGetUserDetails( userID, out details ) ) {
                 MenuOption choice = null; // Catch user's choice.
-                int?       online = null; // Number of users online.
-                int?       unread = null; // Number of user's unread postcards.
-                string     prompt = null; // For building menu prompt.
+                int        online = 0;    // Number of users online.
+                int        unread = 0;    // Number of user's unread postcards.
+                string     prompt = "";   // For building menu prompt.
 
                 // Run the welcome menu until the user logs out.
                 while( choice != optLogout ) {
-                    prompt = $"Welcome, { details.Value.nameFirst }!";
+                    prompt = $"Welcome, { details.nameFirst }!";
 
                     // Get the number of user's online.
                     if( TryGetUsersOnline( out online ) ) {
@@ -441,12 +444,16 @@ namespace Postcard
                 };
             } else {
                 // Something bad must have happened.
-                Console.WriteLine( "Ut, oh...  Something went wrong!" );
+                Console.WriteLine(
+                    "Oh, no...  Something went wrong logging you in!\n"
+                +   "Please check your connection and try again later.  Sorry about this."
+                );
+
                 Pause();
             }
         }
 
-        private static bool TryGetUnreadPostcards( int userID, out int? count ) {
+        private static bool TryGetUnreadPostcards( int userID, out int count ) {
             // Connect to the database.
             using( var con = new MySqlConnection( cs ) ) {
                 con.Open();
@@ -480,7 +487,7 @@ namespace Postcard
                             return true;
                         } else {
                             // Return 0 with failure.
-                            count = null;
+                            count = 0;
 
                             return false;
                         }
@@ -490,7 +497,7 @@ namespace Postcard
         }
 
         // Query how many users are online right now.
-        private static bool TryGetUsersOnline( out int? count ) {
+        private static bool TryGetUsersOnline( out int count ) {
             // Connect to the database.
             using( var con = new MySqlConnection( cs ) ) {
                 con.Open();
@@ -515,7 +522,7 @@ namespace Postcard
                             return true;
                         } else {
                             // Return 0 with failure.
-                            count = null;
+                            count = 0;
 
                             return false;
                         }
@@ -525,7 +532,7 @@ namespace Postcard
         }
 
         // Query user details from database with userID.
-        private static bool TryGetUserDetails( int userID, out UserDetails? details ) {
+        private static bool TryGetUserDetails( int userID, out UserDetails details ) {
 
             // Connect to the database.
             using( var con = new MySqlConnection( cs ) ) {
@@ -562,7 +569,7 @@ namespace Postcard
                         } else {
                             // Login was unsuccessfull.
                             // Return null with failure.
-                            details = null;
+                            details = new UserDetails { };
 
                             return false;
                         }
@@ -576,12 +583,12 @@ namespace Postcard
             // Make sure the user really wants to logout.
             if( Confirmed( "Are you sure you want to logout of Postcard?" ) ) {
                 // Get the logged in user's details.
-                UserDetails? details;
+                UserDetails details;
                 string       name = "";
 
                 // Customize farewell, if possible.
                 if( TryGetUserDetails( userID, out details ) ) {
-                    name = ", " + details.Value.nameFirst;
+                    name = ", " + details.nameFirst;
                 }
 
                 // Let the user know logout succeeded.  It can't fail because userID
@@ -615,7 +622,7 @@ namespace Postcard
                     cmd.Parameters.AddWithValue( "@UserID", userID );
 
                     // Execute the query.
-                    if( cmd.ExecuteNonQuery() == 1) {
+                    if( cmd.ExecuteNonQuery() == 1 ) {
                         // Success means a row got updated.
                         return true;
                     } else {
@@ -634,16 +641,308 @@ namespace Postcard
             ) == "YES";
         }
 
-        private static void Profile() {
+        // Displays a user profile to the console with a contextual
+        // menu for editing the user's own or writing to another's.
+        private static void ProfileOwn( int userID ) {
+            // Get the logged in user's details.
+            UserDetails details = new UserDetails { };
 
+            // Options for profile menu.
+            var optUsername     = new ActionOnlyOption(
+                "Edit Your Username"
+            ,   () => Username(  ref details ) 
+            );
+
+            var optPassword     = new ActionOnlyOption(
+                "Edit Your Password"
+            ,   () => Password(  ref details ) 
+            );
+
+            var optFirstName    = new ActionOnlyOption(
+                "Edit Your First Name"
+            ,   () => FirstName( ref details ) 
+            );
+
+            var optLastName     = new ActionOnlyOption(
+                "Edit Your Last Name"
+            ,   () => LastName(  ref details ) 
+            );
+
+            var optDone     = new CancelOption(
+                "Done - Go Back to the Last Screen"
+            );
+
+            // Profile menu.
+            var menuProfile = new SuperMenu(
+                error : "Oops!  That one isn't available.  Try again."
+            ) {
+                optUsername, optPassword, optFirstName, optLastName, optDone
+            };
+
+            // Check if details were found, prompting and diverting
+            // the user accordingly.
+            if( TryGetUserDetails( userID, out details ) ) {
+                MenuOption choice = null; // Catch user's choice.
+                string     prompt = null; // For building menu prompt.
+
+                // Run the welcome menu until the user logs out.
+                while( choice != optDone ) {
+                    prompt = "Here is your profile.\n\n"
+                           +   $"- Username:   { details.nameUser  }\n"
+                           +   $"- Password:   { details.password  }\n"
+                           +   $"- First Name: { details.nameFirst }\n"
+                           +   $"- Last Name:  { details.nameLast  }\n\n";
+
+                    menuProfile.Prompt = prompt + "What would you like to do now?";
+                    choice             = menuProfile.Run();
+
+                    // Don't pause twice on exit.
+                    if( choice != optDone ) Pause();
+                };
+            } else {
+                // Failed to load profile.
+                Console.WriteLine(
+                    "Oh, no...  Something went wrong loading the profile!\n"
+                +   "Please check your connection and try again later.  Sorry about this."
+                );
+
+                Pause();
+            }
         }
 
-        private static void Edit() {
+        // Prompt the user for a new username that does not exist, giving
+        // the user the option to try again if it does, or give up.  Upon
+        // successfully finding a new user name, attempt to update the user's
+        // profile on the database.  Let the user rechoose the same username
+        // and simply do not write it in this case.
+        private static bool Username( ref UserDetails details ) {
+            // Options for existing username menu.
+            var optAgain   = new ActionOnlyOption(
+                "Try a Different Username"
+            ,   () => { }
+            );
 
+            var optCancel  = new CancelOption(
+                "Cancel - Go Back"
+            );
+
+            // Existing username menu.
+            var menuExists = new SuperMenu(
+                "Oh, no!  It looks like someone already has that username.\n"
+            +   "What would you like to do?"
+            ,   "Oops!  Can't do that here.  Try again."
+            ) {
+                optAgain, optCancel
+            };
+
+            string     username = null; // Desired username.
+            bool       exists   = true; // Hold existence.
+            MenuOption choice   = null; // Catch user's choice
+
+            // Get the user's desired username.  Keep trying
+            // until a unique one is provided or the user quits trying
+            while( exists && username != details.nameUser ) {
+                username = GetNewUsername();
+                exists   = UsernameExists( username );
+                
+                // Give the user the option to keep trying if it does.
+                if( exists && username != details.nameUser ) {
+                    choice = menuExists.Run();
+                }
+
+                // Handle the user giving up gracefully.
+                if( choice == optCancel ) {
+                    // Entreat the user to try again later.
+                    Console.WriteLine(
+                        "Oh, well... Maybe try again later when you think of another."
+                    );
+
+                    return false;
+                }
+            }
+
+            // No need to update the database for same username.
+            if( details.nameUser == username ) {
+                // Same username.
+                return true;
+            } else {
+                // Different username.
+                var updated   = new UserDetails {
+                    userID    = details.userID
+                ,   nameUser  = username
+                ,   password  = details.password
+                ,   nameFirst = details.nameFirst
+                ,   nameLast  = details.nameLast
+                };
+
+                // Attempt to write the change to the database.
+                if( TryUpdateUserDetails( updated ) ) {
+                    // Update succeeded. User will see it in profile.
+                    details = updated;
+
+                    return true;
+                } else {
+                    // Update failed.
+                    Console.WriteLine(
+                        "Oh, no...  Something went wrong updating your username!\n"
+                    +   "Please check your connection and try again later.  Sorry about this."
+                    );
+
+                    return false;
+                }
+            }
+        }
+
+        // Query to update the user's profile details.
+        private static bool TryUpdateUserDetails( UserDetails details ) {
+            // Connect to the database.
+            using( var con = new MySqlConnection( cs ) ) {
+                con.Open();
+
+                // Issue a query to update the user's details.
+                using( var cmd = con.CreateCommand() ) {
+                    // Update everything but userID and loggedIn.
+                    cmd.CommandText = "update Users                   "
+                                    + "set    nameUser  = @Username,  "
+                                    + "       password  = @Password,  "
+                                    + "       nameFirst = @FirstName, " 
+                                    + "       nameLast  = @LastName   "
+                                    + "where  userID    = @UserID     ";
+
+                    // Parameterize to avoid SQL injection.
+                    cmd.Parameters.AddWithValue( "@UserID",    details.userID    );
+                    cmd.Parameters.AddWithValue( "@Username",  details.nameUser  );
+                    cmd.Parameters.AddWithValue( "@Password",  details.password  );
+                    cmd.Parameters.AddWithValue( "@FirstName", details.nameFirst );
+                    cmd.Parameters.AddWithValue( "@LastName",  details.nameLast  );
+
+                    // Execute the query.
+                    if( cmd.ExecuteNonQuery() == 1 ) {
+                        // Success means a row got updated.
+                        return true;
+                    } else {
+                        // Anything else means something went wrong.
+                        return false;
+                    };
+                }
+            }
+        }
+
+        // Prompt the user for a new password and attempt to update the user's
+        // profile on the database.  Do not write same password to database.
+        private static bool Password( ref UserDetails details ) {
+            // Get the user's new password.
+            string password = GetNewPassword();
+
+            // No need to update the database for same password.
+            if( details.nameUser == password ) {
+                // Same password.
+                return true;
+            } else {
+                // Different password.
+                var updated   = new UserDetails {
+                    userID    = details.userID
+                ,   nameUser  = details.nameUser
+                ,   password  = password
+                ,   nameFirst = details.nameFirst
+                ,   nameLast  = details.nameLast
+                };
+
+                // Attempt to write the change to the database.
+                if( TryUpdateUserDetails( updated ) ) {
+                    // Update succeeded. User will see it in profile.
+                    details = updated;
+
+                    return true;
+                } else {
+                    // Update failed.
+                    Console.WriteLine(
+                        "Oh, no...  Something went wrong updating your password!\n"
+                    +   "Please check your connection and try again later.  Sorry about this."
+                    );
+
+                    return false;
+                }
+            }
+        }
+
+        // Prompt the user for a new first name and attempt to update the user's
+        // profile on the database.  Do not write same first name to database.
+        private static bool FirstName( ref UserDetails details ) {
+            // Get the user's new first name.
+            string firstName = GetNewFirstName();
+
+            // No need to update the database for same first name.
+            if( details.nameFirst == firstName ) {
+                // Same first name.
+                return true;
+            } else {
+                // Different first name.
+                var updated   = new UserDetails {
+                    userID    = details.userID
+                ,   nameUser  = details.nameUser
+                ,   password  = details.password
+                ,   nameFirst = firstName
+                ,   nameLast  = details.nameLast
+                };
+
+                // Attempt to write the change to the database.
+                if( TryUpdateUserDetails( updated ) ) {
+                    // Update succeeded. User will see it in profile.
+                    details = updated;
+
+                    return true;
+                } else {
+                    // Update failed.
+                    Console.WriteLine(
+                        "Oh, no...  Something went wrong updating your first name!\n"
+                    +   "Please check your connection and try again later.  Sorry about this."
+                    );
+
+                    return false;
+                }
+            }
+        }
+
+        // Prompt the user for a new last name and attempt to update the user's
+        // profile on the database.  Do not write same last name to database.
+        private static bool LastName( ref UserDetails details ) {
+            // Get the user's new last name.
+            string lastName = GetNewLastName();
+
+            // No need to update the database for same first name.
+            if( details.nameLast == lastName ) {
+                // Same first name.
+                return true;
+            } else {
+                // Different first name.
+                var updated   = new UserDetails {
+                    userID    = details.userID
+                ,   nameUser  = details.nameUser
+                ,   password  = details.password
+                ,   nameFirst = details.nameFirst
+                ,   nameLast  = lastName
+                };
+
+                // Attempt to write the change to the database.
+                if( TryUpdateUserDetails( updated ) ) {
+                    // Update succeeded. User will see it in profile.
+                    details = updated;
+
+                    return true;
+                } else {
+                    // Update failed.
+                    Console.WriteLine(
+                        "Oh, no...  Something went wrong updating your last name!\n"
+                    +   "Please check your connection and try again later.  Sorry about this."
+                    );
+
+                    return false;
+                }
+            }
         }
 
         private static void Postcards() {
-
         }
 
         private static void Postcard() {
