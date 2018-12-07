@@ -393,13 +393,12 @@ namespace Postcard
             );
 
             var optUsers     = new ActionOnlyOption(
-                "Browse Other Users"
+                "Browse Other Users Profiles"
             ,   () => Users( userID )
             );
 
-            var optLogout    = new ActionOnlyOption(
-                "Logout of Your Postcard Account"
-            ,   () => Logout( userID )
+            var optLogout    = new CancelOption(
+                "Logout of Postcard"
             );
 
             // Welcome menu.
@@ -447,6 +446,16 @@ namespace Postcard
 
                     menuWelcome.Prompt = prompt + "\n\nWhat would you like to do now?";
                     choice             = menuWelcome.Run();
+
+                    // Confirm the user wants to logout.
+                    if( choice == optLogout &&
+                        Confirmed( "Are you sure you want to logout of Postcard?" ) ) {
+                        // The user really wants to logout.
+                        Logout( userID );
+                    } else {
+                        // The user wants to stay logged in.
+                        choice = null;
+                    }
 
                     // Don't pause twice on logout.
                     if( choice != optLogout ) Pause();
@@ -589,26 +598,20 @@ namespace Postcard
 
         // On confirmation, log the user out.
         private static void Logout( int userID ) {
-            // Make sure the user really wants to logout.
-            if( Confirmed( "Are you sure you want to logout of Postcard?" ) ) {
-                // Get the logged in user's details.
-                UserDetails details;
-                string       name = "";
+            // Get the logged in user's details.
+            UserDetails details;
 
-                // Customize farewell, if possible.
-                if( TryGetUserDetails( userID, out details ) ) {
-                    name = ", " + details.nameFirst;
-                }
+            // Customize farewell, if possible.
+            string name = ( TryGetUserDetails( userID, out details ) ? ", " + details.nameFirst : "" );
 
-                // Let the user know logout succeeded.  It can't fail because userID
-                // goes out of scope when the login scope exits back to the start menu.
-                // But, marking the user as logged out could...
-                Console.Clear();
-                Console.WriteLine(
-                    $"You've been logged out.  Come back soon, { name }!"
-                +   ( TryMarkLoggedOut( userID ) ? "" : "You may still appear as online to other users." )
-                );
-            }
+            // Let the user know logout succeeded.  It can't fail because userID
+            // goes out of scope when the login scope exits back to the start menu.
+            // But, marking the user as logged out could...
+            Console.Clear();
+            Console.WriteLine(
+                $"You've been logged out.  Come back soon{ name }!"
+            +   ( TryMarkLoggedOut( userID ) ? "" : "You may still appear as online to other users." )
+            );
         }
 
         // Query to mark the logged in user as logged out.
@@ -1144,6 +1147,16 @@ namespace Postcard
             while( choice != optDiscard && choice != optSend ) {
                 menuWrite.Prompt = getPrompt();
                 choice = menuWrite.Run();
+
+                // Confirm the user really wants to discard.
+                if( choice == optDiscard &&
+                    // User canceled.
+                    !Confirmed( "Are you sure you want to discard this postcard?" ) ) {
+                    choice = null;
+                } else {
+                    // The cancel is a sure thing.  Leave Dodge.
+                    return;
+                }
             }
 
             // Send the postcard and mark it as read by the user (sender)
