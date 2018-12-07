@@ -164,7 +164,7 @@ namespace Postcard
                 // Issue a query to mark the user as logged in.
                 using( var cmd = con.CreateCommand() ) {
                     // Logged in is true for matching userID
-                    cmd.CommandText = "update users              "
+                    cmd.CommandText = "update Users              "
                                     + "set    loggedIn = 1       "
                                     + "where  userID   = @UserID ";
 
@@ -296,7 +296,7 @@ namespace Postcard
                 // Issue a query to add the user.
                 using( var cmd = con.CreateCommand() ) {
                     // Insert all the details.  UserID generated automatically.
-                    cmd.CommandText = "insert into users( "
+                    cmd.CommandText = "insert into Users( "
                                     + "  nameUser         "
                                     + ", password         "
                                     + ", nameFirst        "
@@ -602,15 +602,12 @@ namespace Postcard
 
                 // Let the user know logout succeeded.  It can't fail because userID
                 // goes out of scope when the login scope exits back to the start menu.
+                // But, marking the user as logged out could...
                 Console.Clear();
-                Console.WriteLine( "You've been logged out.  Come back soon{0}!", name );
-
-                // Check if the user can be marked logged out, informing
-                // the user accordingly.
-                if( !TryMarkLoggedOut( userID ) ) {
-                    // Marking as logged out failed somehow.
-                    Console.WriteLine( "You may still appear as online to other users." );
-                }
+                Console.WriteLine(
+                    $"You've been logged out.  Come back soon, { name }!"
+                +   ( TryMarkLoggedOut( userID ) ? "" : "You may still appear as online to other users." )
+                );
             }
         }
 
@@ -623,7 +620,7 @@ namespace Postcard
                 // Issue a query to mark the user as logged out.
                 using( var cmd = con.CreateCommand() ) {
                     // Logged in is false for matching userID
-                    cmd.CommandText = "update users              "
+                    cmd.CommandText = "update Users              "
                                     + "set    loggedIn = 0       "
                                     + "where  userID   = @UserID ";
 
@@ -1100,49 +1097,155 @@ namespace Postcard
         // give the user a chance to review and send the message, or cancel
         // sending the postcard with confirmation.
         private static void Write( int userID, UserDetails details ) {
+            // The whole postcard.
+            var postcard = new CardDetails {
+                fromID   = userID
+            ,   toID     = details.userID
+            ,   date     = DateTime.Today
+            ,   message  = GetNewMessage( details.nameUser )
+            };
+
             // Write menu options.
-            var optSend = new ActionOnlyOption(
+            var optSend = new CancelOption(
                 $"Send Your Postcard to { details.nameUser } Now!"
-            ,   () => { }
             );
 
             var optEdit = new ActionOnlyOption(
                 "Change Your Postcard's Message"
-            ,   () => { }
+            ,   () => {
+                    postcard.message = GetNewMessage(
+                        details.nameUser, postcard.message );
+                }
             );
 
             var optDiscard = new CancelOption(
                 $"Discard Your Postcard to { details.nameUser } and Go Back"
             );
 
+            // Local function to return up-to-date menu prompt.
+            string getPrompt() => 
+                "Here is your postcard:\n\n"
+            +   "From: You\n"
+            +  $"To:   { details.nameUser }\n"
+            +  $"Date: { DateTime.Today.ToString( "yyyy-MM-dd") }\n\n"
+            +  $"Body: \n\n{ postcard.message }"
+            + "\n\nWhat would you like to do?";
+
             // Write menu.
             var menuWrite  = new SuperMenu(
                 error : "That's not in the menu!  Try again."
-            );
-
-            // Get message to put on postcard to selected user.
-            string message = GetNewMessage( details.nameUser );
+            ) {
+                optSend, optEdit, optDiscard
+            };
 
             MenuOption choice = null; // Catch the user's choice.
+            
+            // Run the write menu until the user sends or discards the postcard.
+            while( choice != optDiscard && choice != optSend ) {
+                menuWrite.Prompt = getPrompt();
+                choice = menuWrite.Run();
+            }
 
-            // TODO: Pick up where we left off here.
+            // Send the postcard and mark it as read by the user (sender)
+            // if possible, informing the user of the outcome.
+            if( choice == optSend && TrySendPostcard( ref postcard ) ) {
+                // Postcard sent successfully.  Marking it as read by the user
+                // (sender) could fail, but not a catastrophe.  Let the user know.
+                Console.WriteLine( 
+                    $"Congratulations... {details.nameFirst} got your postcard!\n"
+                +   ( TryMarkAsRead( postcard.cardID, userID ) ? "" : "Your postcard may appear unread by you." )
+                );
+            } else {
+                // Postcard failed to send.
+                Console.WriteLine(
+                    "Oh, no...  Something went wrong sending your postcard!\n"
+                +   "Please check your connection and try again later.  Sorry about this."
+                );
+            }
 
-            // The whole postcard.
-            var postcard = new CardDetails {
-                fromID   = userID
-            ,   toID     = details.userID
-            ,   date     = DateTime.Today
-            ,   message  = message
-            };
+            // Don't pause twice on logout.
+            if( choice != optDiscard && choice != optSend ) Pause();
         }
 
-        // Prompt user for message to send to selected user.
-        private static string GetNewMessage( string username ) {
+        // Query to insert a postcard and it's reader into Readers.
+        private static bool TryMarkAsRead( int cardID, int userID ) {
+            // Connect to the database.
+            using( var con = new MySqlConnection( cs ) ) {
+                con.Open();
+
+                // Issue a query to insert the postcard.
+                using( var cmd = con.CreateCommand() ) {
+                    // Logged in is false for matching userID
+                    cmd.CommandText = "insert ignore into Readers "
+                                    + "set cardID = @CardID,      "
+                                    + "    userID = @UserID       ";
+
+                    // Parameterize to avoid SQL injection.
+                    cmd.Parameters.AddWithValue( "@CardID", cardID );
+                    cmd.Parameters.AddWithValue( "@UserID", userID );
+
+                    // Execute the query.
+                    if( cmd.ExecuteNonQuery() == 1 ) {
+                        // Success means a row got inserted.
+                        return true;
+                    } else {
+                        // Anything else means something went wrong.
+                        return false;
+                    };
+                }
+            }
+        }
+
+        // Query to insert postcard to Postcards table in the database.
+        private static bool TrySendPostcard( ref CardDetails postcard ) {
+            // Connect to the database.
+            using( var con = new MySqlConnection( cs ) ) {
+                con.Open();
+
+                // Issue a query to insert the postcard.
+                using( var cmd = con.CreateCommand() ) {
+                    // Logged in is false for matching userID
+                    cmd.CommandText = "insert into Postcards( "
+                                    + "  fromID               "
+                                    + ", toID                 "
+                                    + ", date                 "
+                                    + ", message )            "
+                                    + "values(                "
+                                    + "  @FromID              "
+                                    + ", @ToID                "
+                                    + ", @Date                "
+                                    + ", @Message )           ";
+
+                    // Parameterize to avoid SQL injection.
+                    cmd.Parameters.AddWithValue( "@FromID",  postcard.fromID  );
+                    cmd.Parameters.AddWithValue( "@ToID",    postcard.toID    );
+                    cmd.Parameters.AddWithValue( "@Date",    postcard.date    );
+                    cmd.Parameters.AddWithValue( "@Message", postcard.message );
+
+                    // Execute the query.
+                    if( cmd.ExecuteNonQuery() == 1 ) {
+                        // Success means a row got inserted.
+                        // Update the postcard's cardID.
+                        postcard.cardID = (int) cmd.LastInsertedId;
+
+                        return true;
+                    } else {
+                        // Anything else means something went wrong.
+                        return false;
+                    };
+                }
+            }
+        }
+
+        // Prompt user for message to send to selected user.  Provide a copy
+        // of the previous draft, if any, for user reference.
+        private static string GetNewMessage( string username, string message = null ) {
             return PromptFor< string >
             (
-                $"What is your postcard's message to { username }?\n"
-            +   "Make sure it isn't empty or over 1,024 characters."
-            +   "Keep in mind that hitting <Enter> finishes the message,"
+                ( message == null ? "" : $"Here's your previous draft for reference:\n\n{ message }\n\n")
+            +   $"What is your postcard's { ( message == null ? "" : "new " ) }message to { username }?\n"
+            +   "Make sure it isn't empty or over 1,024 characters.\n"
+            +   "Keep in mind that hitting <Enter> finishes the message,\n"
             +   "so don't try to separate paragraphs with blank lines."
             ,   "Oops... That was too long or too short.  Can't send that!  Try again."
             ,   any => !string.IsNullOrEmpty( any ) && any.Length <= 1024
