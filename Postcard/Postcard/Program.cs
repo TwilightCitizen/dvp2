@@ -1531,13 +1531,14 @@ namespace Postcard {
                 choice = menuWrite.Run();
 
                 // Confirm the user really wants to discard.
-                if( choice == optDiscard &&
+                if( choice == optDiscard ) {
                     // User canceled.
-                    !Confirmed( "Are you sure you want to discard this postcard?" ) ) {
+                    if( !Confirmed( "Are you sure you want to discard this postcard?" ) ) {
                     choice = null;
-                } else {
-                    // The cancel is a sure thing.  Leave Dodge.
-                    return;
+                    } else {
+                        // The cancel is a sure thing.  Leave Dodge.
+                        return;
+                    }
                 }
             }
 
