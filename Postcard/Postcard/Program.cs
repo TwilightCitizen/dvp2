@@ -1056,6 +1056,9 @@ namespace Postcard {
                 return;
             }
 
+            // Save username since details is reused later.
+            string viewerName = details.nameUser; 
+
             // Options for postcards filter menu.
 
             var optTo   = new CancelOption(
@@ -1072,7 +1075,7 @@ namespace Postcard {
 
             // Postcards filter menu.
             var menuFilter = new SuperMenu(
-                $"Which postcards of { ( viewingOwn ? "yours" : details.nameUser + "'s" ) } did you want to see?"
+                $"Which postcards of { ( viewingOwn ? "yours" : viewerName + "'s" ) } did you want to see?"
             ) {
                 optTo, optFrom, optCancel
             };
