@@ -70,6 +70,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using MySql.Data.MySqlClient;
 using Utilities.Terminal;
 using static Utilities.Terminal.IO;
@@ -1095,7 +1096,7 @@ namespace Postcard
                                                 + $"Date: { postcard.date.ToString( "yyyy-MM-dd" ) }"
                                                 : $"From: { details.nameUser }, "
                                                 + $"Date: { postcard.date.ToString( "yyyy-MM-dd" ) }"
-                                                + ( TryGetUnreadBy( postcard.cardID, viewerID ) ? "- [Unread]" : "" ) )
+                                                + ( TryGetUnreadBy( postcard.cardID, viewerID ) ? " (Unread)" : "" ) )
                         ,   () => { }
                         );
 
@@ -1106,7 +1107,7 @@ namespace Postcard
                             // Silently try to mark it as read by the viewer, ignoring failures.
                             if( TryMarkAsRead( postcard.cardID, viewerID ) ) {
                                 // Remove "[Unread]" from postcard option.
-                                opt.Text = opt.Text.Replace( "_ [Unread]", "" );
+                                opt.Text = opt.Text.Replace( "- [Unread]", "" );
                             }
                         };
 
@@ -1114,16 +1115,20 @@ namespace Postcard
                         menuPostcards.Add( opt );
                     } );
 
-                    menuPostcards.Add( optCancel );
+                    // Need a separate cancel option.  Reusing the one for the
+                    // outer menu causes weird numbering.
+                    var optNone = new CancelOption(  "Nevermind - Go Back" );
+
+                    menuPostcards.Add( optNone  );
 
                     MenuOption card = null; // Catch the user's choice.
 
                     // Run the postcards menu until the user quits.
-                    while( card != optCancel && choice != optCancel ) {
+                    while( card != optNone && choice != optCancel ) {
                         card = menuPostcards.Run();
 
                         // Don't pause twice on cancel.
-                        if( card != optCancel && choice != optCancel ) Pause();
+                        if( card != optNone && choice != optCancel ) Pause();
                     }
 
                 } else {
@@ -1229,18 +1234,32 @@ namespace Postcard
 
         // Display the selected postcard to the console.
         private static void Postcard( CardDetails postcard ) {
-            UserDetails from; // Details of the sender.
-            UserDetails to;   // Details of the recipient.
+            UserDetails from;            // Details of the sender.
+            UserDetails to;              // Details of the recipient.
+            List< UserDetails > readers; // Details of readers of the postcard.
+
+            // Get details of users that read the postcard, if any.
+            bool hasReaders = TryGetReaders( postcard.cardID, out readers );
+
+            // Format is nicely.
+            var  readerList = string.Join(
+                ", "
+            ,   readers.Select( reader => 
+                    reader.nameUser
+                +   ( reader.loggedIn ? " (Online)" : "" )
+                )
+            );
 
             // Try to get the sender's and recipient's details.
             if( TryGetUserDetails( postcard.fromID, out from ) &&
                 TryGetUserDetails( postcard.toID,   out to   ) ) {
-                // Loading sender and recipient details succeeded.
+                // Loading sender's, recipient's, and readers' details succeeded.
                 Console.WriteLine( 
                      "Here's the postcard you selected:\n\n"
                 +   $"From:    { from.nameUser }\n"
                 +   $"To:      { to.nameUser   }\n"
-                +   $"Date:    { postcard.date.ToString( "yyyy-mm-dd") }\n\n"
+                +   $"Date:    { postcard.date.ToString( "yyyy-mm-dd") }\n"
+                +   $"Read By: { ( hasReaders ? readerList : "Nobody" ) }\n\n"
                 +    "Message:\n\n"
                 +   postcard.message
                 );
@@ -1250,6 +1269,59 @@ namespace Postcard
                     "Oh, no...  Something went wrong reading the postcard!\n"
                 +   "Please check your connection and try again later.  Sorry about this."
                 );
+            }
+        }
+
+        // Query to get details of users that read a postcard, if any.
+        private static Boolean TryGetReaders( int cardID, out List< UserDetails > readers ) {
+            // Other users' details.
+            var users = new List< UserDetails >();
+
+            // Connect to the database.
+            using( var con = new MySqlConnection( cs ) ) {
+                con.Open();
+
+                // Issue a parameterized query of users' details.
+                using( var cmd = con.CreateCommand() ) {
+                    // Users where userID do not match userID.
+                    cmd.CommandText = "select *                   "
+                                    + "from   Readers as R        "
+                                    + "join   Users   as U        "
+                                    + "on     R.userID = U.userID "
+                                    + "where  R.cardID = @CardID  ";
+
+                    // Parameterize to avoid SQL injection.
+                    cmd.Parameters.AddWithValue( "@CardID", cardID );
+
+                    // Execute the query.
+                    using( MySqlDataReader rdr = cmd.ExecuteReader() ) {
+                        // Check the results.
+                        if( rdr.HasRows ) {
+                            // We have other users.
+                            while( rdr.Read() ) {
+                                // Add user's details to list.
+                                users.Add( new UserDetails {
+                                    userID    = int.Parse(  rdr[ "userID"    ].ToString() )
+                                ,   nameUser  =             rdr[ "nameUser"  ].ToString()
+                                ,   nameFirst =             rdr[ "nameFirst" ].ToString()
+                                ,   nameLast  =             rdr[ "nameLast"  ].ToString()
+                                ,   loggedIn  = bool.Parse( rdr[ "loggedIn"  ].ToString() )
+                                ,   password  = ""
+                                } );
+                            }
+
+                            // Return the readers' details with success.
+                            readers = users;
+
+                            return true;
+                        } else {
+                            // Return empty with failure.
+                            readers = users;
+
+                            return false;
+                        }
+                    }
+                }
             }
         }
 
