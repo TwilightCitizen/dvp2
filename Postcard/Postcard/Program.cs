@@ -1,6 +1,75 @@
-﻿using System;
+﻿/* Because of how available menu options are presented in
+ * subsequently deeper calls from the start screen's menu,
+ * and those menus, no menu options require conditions to
+ * signal whether or not they should be enabled.If an
+ * option shouldn't be enabled, it doesn't appear on the
+ * screen.  More or less, this is represenational state
+ * transfer, or RESTful, design. */
+ 
+/* In some cases where a menu option doesn't need to run
+ * an associated action, a CancelOption is used in it's 
+ * stead, which is caught in a variable, examined, and
+ * acted on accordingly.  It's a bit of an abuse of the
+ * CancelOption, which was originally designed specifically
+ * for cancellations by the user, but it works.  However,
+ * it calls for an eventual addition of a NoActionOption,
+ * NullOption, or whatever it might be called, the
+ * purpose of which is clearer than a CancelOption. */
+
+/* App screens and menus, under any reasonable conditions,
+ * won't fail, but database updates can fail for any
+ * number of reasons.  Because of this, all database
+ * transactions are coded in their own methods, prefixed
+ * with Try, which return a boolean to indicate success
+ * or failure, and an out or ref parameter through which
+ * to return any query results, if needed by the app.
+ * Code that calls these methods naturally results in
+ * a defensive programming posture against failures. */
+
+/* Rather than using classes to represent certain
+ * database entities, structs are used in their stead.
+ * This was more, than anything, to get some practice
+ * with them, as they behave similarly to classes, but
+ * are value types rather than reference types.  Time-
+ * dependent, of course, but you may see some instances
+ * where some refactoring is in order due to learning
+ * their peculiarities from classes.  Aside from that,
+ * programming with them in C# makes C# feel a bit more
+ * functional like F#.  Some struct mutation does feature,
+ * which isn't very F#-ish, no struct has methods.
+ * Rather, the program module has methods, some of which
+ * accept and act on structs. */
+
+ /* A way to go more F#-like here would be to change all
+  * the Try-prefixed methods from those that return a bool
+  * and feature an out or ref parameter to ones that return
+  * a tuple of a success value and a possibly modified
+  * copy of whatever struct--if any--were passed in. */
+
+/* Originally, many Private Static menus and menu options
+ * were envisioned.  To tame them at the head of the
+ * module, collapsible regions were introduced.  These
+ * really aren't neccessary now, as all menus and menu
+ * options reside within the screen methods that need
+ * them, but still something worthwhile to explore as
+ * codebases grow in line count. */
+
+/* SuperMenu's Run() method clears the screen before
+ * displaying it's menu options.  It was designed this way
+ * with DRY in mind:  Why write Console.Clear() before
+ * every call to whateverMenu.Run()?  Well, as it turns
+ * out, sometimes--maybe more often than not--it's useful
+ * not to clear the screen before displaying the menu
+ * automatically.  In it's current design, anything a
+ * user of the class wants to write to screen to appear
+ * before the menu is display must be constructed and
+ * fed into the menu as the prompt.  It's a workaround
+ * that features often in this app.  A boolean withClear
+ * parameter to SuperMenu's constructor could alleviate
+ * this accidentally designed idiom. */
+
+using System;
 using System.Collections.Generic;
-using System.Linq;
 using MySql.Data.MySqlClient;
 using Utilities.Terminal;
 using static Utilities.Terminal.IO;
@@ -23,12 +92,12 @@ namespace Postcard
 
         // Details about a user.
         private struct UserDetails {
-            public int    userID;
-            public string nameFirst;
-            public string nameLast;
-            public string nameUser;
-            public string password;
-            public bool   loggedIn;
+            public int      userID;
+            public string   nameFirst;
+            public string   nameLast;
+            public string   nameUser;
+            public string   password;
+            public bool     loggedIn;
         }
 
         // Details about a postcard.
@@ -388,12 +457,12 @@ namespace Postcard
             );
 
             var optRead      = new ActionOnlyOption(
-                "Read Your Postcards"
-            ,   Postcards
+                "Read Your Postcards!"
+            ,   () => Postcards( userID, userID )
             );
 
             var optUsers     = new ActionOnlyOption(
-                "Browse Other Users Profiles"
+                "Browse Other Users Profiles!"
             ,   () => Users( userID )
             );
 
@@ -951,15 +1020,241 @@ namespace Postcard
             }
         }
 
-        private static void Postcards() {
+        // Prompt the user with a menu to see postcards to or from
+        // the selected user--or his or her own--subsequently.
+        private static void Postcards( int userID, int viewerID ) {
+            // Determine if the user is viewing his- or her own
+            // postcards, or someone else's.
+            bool viewingOwn = userID == viewerID;
+
+            // Other user's details.
+            UserDetails details;
+
+            // If user details can't load, likely neither can postcards.
+            // Inform and divert the user accordingly.
+            if( !TryGetUserDetails( userID, out details ) ) {
+                // Getting the user's details failed.
+                Console.WriteLine(
+                    "Oh, no...  Something went wrong getting the postcards!\n"
+                +   "Please check your connection and try again later.  Sorry about this."
+                );
+
+                // Get out of dodge.
+                return;
+            }
+
+            // Options for postcards filter menu.
+
+            var optTo   = new CancelOption(
+                $"Postcards to { ( viewingOwn ? "You" : details.nameUser ) }."
+            );
+
+            var optFrom = new CancelOption(
+                $"Postcards from { ( viewingOwn ? "You" : details.nameUser ) }."
+            );
+
+            var optCancel = new CancelOption(
+                "Nevermind - Go Back."
+            );
+
+            // Postcards filter menu.
+            var menuFilter = new SuperMenu(
+                $"Which postcards of { ( viewingOwn ? "yours" : details.nameUser + "'s" ) } did you want to see?"
+            ) {
+                optTo, optFrom, optCancel
+            };
+
+            MenuOption          choice    = null; // Catch the user's choice.
+            List< CardDetails > postcards = null; // Catch the postcards.
+
+            // Run the filter menu until the user quits.
+            while( choice != optCancel ) {
+                choice = menuFilter.Run();
+
+                // Get the postcards the user chose.
+                if( TryGetPostcards( userID, out postcards, choice == optFrom ) ) {
+                    // Getting postcards succeeded.
+
+                    // Postcards menu.
+                    var menuPostcards = new SuperMenu(
+                        $"Which postcard { ( choice == optFrom ? "from" : "to" ) } "
+                    +   $"{ ( viewingOwn ? "you" : details.nameUser ) } do you want to view?"
+                    );
+
+                    // Load all the postcard options into the postcards menu.
+                    postcards.ForEach( postcard => {
+                        // Load the right username into details.
+                        _ = choice == optFrom ? viewingOwn : TryGetUserDetails( postcard.toID,   out details )
+                                                           ? TryGetUserDetails( postcard.fromID, out details )
+                                              : viewingOwn ? TryGetUserDetails( postcard.fromID, out details )
+                                                           : TryGetUserDetails( postcard.toID,   out details );
+
+                        // Format the postcard option.
+                        var opt = new ActionOnlyOption(
+                            ( choice == optFrom ? $"To: { details.nameUser }, "
+                                                + $"Date: { postcard.date.ToString( "yyyy-MM-dd" ) }"
+                                                : $"From: { details.nameUser }, "
+                                                + $"Date: { postcard.date.ToString( "yyyy-MM-dd" ) }"
+                                                + ( TryGetUnreadBy( postcard.cardID, viewerID ) ? "- [Unread]" : "" ) )
+                        ,   () => { }
+                        );
+
+                        // Set up it's action to refer to itself for marking read.
+                        opt.Action = () => {
+                            // Display the postcard to the user.
+                            Postcard( postcard );
+                            // Silently try to mark it as read by the viewer, ignoring failures.
+                            if( TryMarkAsRead( postcard.cardID, viewerID ) ) {
+                                // Remove "[Unread]" from postcard option.
+                                opt.Text = opt.Text.Replace( "_ [Unread]", "" );
+                            }
+                        };
+
+                        // Add the option to the postcards menu.
+                        menuPostcards.Add( opt );
+                    } );
+
+                    menuPostcards.Add( optCancel );
+
+                    MenuOption card = null; // Catch the user's choice.
+
+                    // Run the postcards menu until the user quits.
+                    while( card != optCancel && choice != optCancel ) {
+                        card = menuPostcards.Run();
+
+                        // Don't pause twice on cancel.
+                        if( card != optCancel && choice != optCancel ) Pause();
+                    }
+
+                } else {
+                    // Getting the user's postcards failed.
+                    Console.WriteLine(
+                        "Hmmm...  There doesn't appear to be any postcards.\n"
+                    +   "Also, check your connection and try again.  That could be the problem."
+                );
+
+                    // Get out of dodge.
+                    return;
+                }
+                
+                // Don't pause twice on cancel.
+                if( choice != optCancel ) Pause();
+            }
         }
 
-        private static void Postcard() {
+        // Query to check if a postcard is unread by a selected user.
+        private static bool TryGetUnreadBy( int cardID, int userID ) {
+            // Connect to the database.
+            using( var con = new MySqlConnection( cs ) ) {
+                con.Open();
 
+                // Issue a parameterized query of matching readers.
+                using( var cmd = con.CreateCommand() ) {
+                    // Readers where cardID and userID match.
+                    cmd.CommandText = "select null             "
+                                    + "from   Readers          "
+                                    + "where  cardID = @CardID "
+                                    + "and    userID = @UserID ";
+
+                    // Parameterize to avoid SQL injection.
+                    cmd.Parameters.AddWithValue( "@CardID", cardID );
+                    cmd.Parameters.AddWithValue( "@UserID", userID );
+
+                    // Execute the query.
+                    using( MySqlDataReader rdr = cmd.ExecuteReader() ) {
+                        // Check the results.
+                        if( rdr.HasRows ) {
+                            // We have a matching reader.
+                            return false;
+                        } else {
+                            // We don't have a matching reader.
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Query to get postcards to or from the selected userID.
+        private static bool TryGetPostcards(
+            int userID, out List< CardDetails > postcards, bool from = false 
+        ) {
+            // Other users' details.
+            var cards = new List< CardDetails >();
+
+            // Connect to the database.
+            using( var con = new MySqlConnection( cs ) ) {
+                con.Open();
+
+                // Issue a parameterized query of cards' details.
+                using( var cmd = con.CreateCommand() ) {
+                    // Users where userID do not match userID.
+                    cmd.CommandText =  "select *                                          "
+                                    +  "from   Postcards                                  "
+                                    + $"where  { ( from ? "fromID" : "toID" ) } = @UserID ";
+
+                    // Parameterize to avoid SQL injection.
+                    cmd.Parameters.AddWithValue( "@UserID", userID );
+
+                    // Execute the query.
+                    using( MySqlDataReader rdr = cmd.ExecuteReader() ) {
+                        // Check the results.
+                        if( rdr.HasRows ) {
+                            // We have postcards.
+                            while( rdr.Read() ) {
+                                // Add postcard's details to list.
+                                cards.Add( new CardDetails {
+                                    cardID  = int.Parse(      rdr[ "cardID"  ].ToString() )
+                                ,   fromID  = int.Parse(      rdr[ "fromID"  ].ToString() )
+                                ,   toID    = int.Parse(      rdr[ "toID"    ].ToString() )
+                                ,   date    = DateTime.Parse( rdr[ "date"    ].ToString() )
+                                ,   message =                 rdr[ "message" ].ToString()
+                                } );
+                            }
+
+                            // Return the users' details with success.
+                            postcards = cards;
+
+                            return true;
+                        } else {
+                            // Return empty with failure.
+                            postcards = cards;
+
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Display the selected postcard to the console.
+        private static void Postcard( CardDetails postcard ) {
+            UserDetails from; // Details of the sender.
+            UserDetails to;   // Details of the recipient.
+
+            // Try to get the sender's and recipient's details.
+            if( TryGetUserDetails( postcard.fromID, out from ) &&
+                TryGetUserDetails( postcard.toID,   out to   ) ) {
+                // Loading sender and recipient details succeeded.
+                Console.WriteLine( 
+                     "Here's the postcard you selected:\n\n"
+                +   $"From:    { from.nameUser }\n"
+                +   $"To:      { to.nameUser   }\n"
+                +   $"Date:    { postcard.date.ToString( "yyyy-mm-dd") }\n\n"
+                +    "Message:\n\n"
+                +   postcard.message
+                );
+            } else {
+                // Loading sender and recipient details failed.
+                Console.WriteLine(
+                    "Oh, no...  Something went wrong reading the postcard!\n"
+                +   "Please check your connection and try again later.  Sorry about this."
+                );
+            }
         }
 
         // Prompt the user with a menu of user profiles other
-        // than the user if there are any.  If not, divert the
+        // than the user, if there are any.  If not, divert the
         // user accordingly.
         private static void Users( int userID ) {
             // Other user menu options.
@@ -974,11 +1269,11 @@ namespace Postcard
 
             
             var        others = new List< UserDetails >(); // Other user's details.
-            MenuOption choice = null;
+            MenuOption choice = null;                      // Cath the user's choice.
 
             // Attempt to get the other users' details.
             if( TryGetOthersDetails( userID, out others ) ) {
-                // There are other users and/or no connectivity issues.
+                // There are other users and; consequently, no connectivity issues.
                 others.ForEach( details =>
                     menuOthers.Add( new ActionOnlyOption( 
                         details.nameUser
@@ -1014,7 +1309,7 @@ namespace Postcard
             using( var con = new MySqlConnection( cs ) ) {
                 con.Open();
 
-                // Issue a parameterized query of user's details.
+                // Issue a parameterized query of users' details.
                 using( var cmd = con.CreateCommand() ) {
                     // Users where userID do not match userID.
                     cmd.CommandText = "select *                 "
@@ -1028,7 +1323,7 @@ namespace Postcard
                     using( MySqlDataReader rdr = cmd.ExecuteReader() ) {
                         // Check the results.
                         if( rdr.HasRows ) {
-                            // We have other users
+                            // We have other users.
                             while( rdr.Read() ) {
                                 // Add user's details to list.
                                 users.Add( new UserDetails {
@@ -1065,6 +1360,11 @@ namespace Postcard
             ,   () => Write( userID, details )
             );
 
+            var optRead     = new ActionOnlyOption(
+                $"Read { details.nameUser }'s Postcards!"
+            ,   () => Postcards( details.userID, userID )
+            );
+
             var optDone     = new CancelOption(
                 "Done - Go Back to the Last Screen"
             );
@@ -1073,7 +1373,7 @@ namespace Postcard
             var menuProfile = new SuperMenu(
                 error : "Oops!  That one isn't available.  Try again."
             ) {
-                optWrite, optDone
+                optWrite, optRead, optDone
             };
 
 
