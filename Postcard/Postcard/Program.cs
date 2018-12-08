@@ -1,4 +1,18 @@
-﻿/* Because of how available menu options are presented in
+﻿/* Name:        David A. Clark, Jr.
+ * Class:       MDV2229-O
+ * Assignment:  3.1 - Project 1c: Coding App & Database (Postcard)
+ * Date:        2018-12-03
+ * 
+ * Tasks:       Postcard is a database-connected console application that
+ *              allows users to login and/or register an account, modify their
+ *              profiles, read their postcards, browse other users' profiles,
+ *              and read other users' postcards.
+ *              
+ * Note:        Uses SuperMenu, various MenuOption subclasses, and PromptFor<T>
+ *              from referenced Utilities class library, and MySQL libraries.
+ */
+
+/* Because of how available menu options are presented in
  * subsequently deeper calls from the start screen's menu,
  * and those menus, no menu options require conditions to
  * signal whether or not they should be enabled.If an
@@ -40,7 +54,7 @@
  * Rather, the program module has methods, some of which
  * accept and act on structs. */
 
- /* A way to go more F#-like here would be to change all
+/* A way to go more F#-like here would be to change all
   * the Try-prefixed methods from those that return a bool
   * and feature an out or ref parameter to ones that return
   * a tuple of a success value and a possibly modified
@@ -75,10 +89,8 @@ using MySql.Data.MySqlClient;
 using Utilities.Terminal;
 using static Utilities.Terminal.IO;
 
-namespace Postcard
-{
-    public class Program
-    {
+namespace Postcard {
+    public class Program {
         #region Constants
 
         private const string cs = "server=192.168.121.1;"
@@ -1084,11 +1096,9 @@ namespace Postcard
 
                     // Load all the postcard options into the postcards menu.
                     postcards.ForEach( postcard => {
-                        // Load the right username into details.
-                        _ = choice == optFrom ? viewingOwn : TryGetUserDetails( postcard.toID,   out details )
-                                                           ? TryGetUserDetails( postcard.fromID, out details )
-                                              : viewingOwn ? TryGetUserDetails( postcard.fromID, out details )
-                                                           : TryGetUserDetails( postcard.toID,   out details );
+                        // Load the right user's details to show.
+                        _ = choice == optFrom ? TryGetUserDetails( postcard.toID, out details )
+                                              : TryGetUserDetails( postcard.fromID,   out details );
 
                         // Format the postcard option.
                         var opt = new ActionOnlyOption(
@@ -1107,7 +1117,7 @@ namespace Postcard
                             // Silently try to mark it as read by the viewer, ignoring failures.
                             if( TryMarkAsRead( postcard.cardID, viewerID ) ) {
                                 // Remove "[Unread]" from postcard option.
-                                opt.Text = opt.Text.Replace( "- [Unread]", "" );
+                                opt.Text = opt.Text.Replace( " (Unread)", "" );
                             }
                         };
 
@@ -1258,7 +1268,7 @@ namespace Postcard
                      "Here's the postcard you selected:\n\n"
                 +   $"From:    { from.nameUser }\n"
                 +   $"To:      { to.nameUser   }\n"
-                +   $"Date:    { postcard.date.ToString( "yyyy-mm-dd") }\n"
+                +   $"Date:    { postcard.date.ToString( "yyyy-MM-dd") }\n"
                 +   $"Read By: { ( hasReaders ? readerList : "Nobody" ) }\n\n"
                 +    "Message:\n\n"
                 +   postcard.message
@@ -1625,8 +1635,7 @@ namespace Postcard
         // Prompt user for message to send to selected user.  Provide a copy
         // of the previous draft, if any, for user reference.
         private static string GetNewMessage( string username, string message = null ) {
-            return PromptFor< string >
-            (
+            return PromptFor< string > (
                 ( message == null ? "" : $"Here's your previous draft for reference:\n\n{ message }\n\n")
             +   $"What is your postcard's { ( message == null ? "" : "new " ) }message to { username }?\n"
             +   "Make sure it isn't empty or over 1,024 characters.\n"
