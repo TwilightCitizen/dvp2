@@ -35,3 +35,13 @@ Console application that allows the user to view and edit student class grade pe
 ### Exercise 4
 
 Console application that present user with some trivia about colors, in particular, the user's favorite color.
+
+## Week 3
+
+### Exercise 5
+
+Console game against the computer of "Rock, Paper, Scissors, Lizard, Spock" that pits the user against the computer for 10 matches, with feedback about each match and a match summary.
+
+### Exercise 6
+
+Console card game where four users are dealt a deck of cards, the total point value of which they are dealt determines their placing, 1st through 4th place.
