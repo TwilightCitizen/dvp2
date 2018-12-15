@@ -113,6 +113,16 @@ namespace TimeTracker
             }
         );
 
+        private static MenuOption optViewCalc   = new ActionOnlyOption
+        (
+            "View Calculations from Your Activity Log"
+        ,   ViewCalc
+        ,   conditions : new List< Func < bool > >()
+            {
+                () => loggedIn != null
+            }
+        );
+
         private static MenuOption optExit       = new ExitOption();
 
         // Main Menu.
@@ -124,6 +134,7 @@ namespace TimeTracker
         ,   optProfile
         ,   optLog
         ,   optAddEntry
+        ,   optViewCalc
         ,   optLookups
         ,   optExit
         };
@@ -487,7 +498,7 @@ namespace TimeTracker
                 menuProfile.Prompt = profile;
 
                 // Display the Profile Edit Menu.
-                choice = menuProfile.Run();
+                choice = menuProfile.Run().Text;
 
                 // Don't pause twice for Return/GoBack
                 if( choice != optReturn.Text ) Pause();
@@ -780,7 +791,7 @@ namespace TimeTracker
                 Console.Clear();
 
                 // Display the Lookups Edit Menu.
-                choice = menuLookups.Run();
+                choice = menuLookups.Run().Text;
 
                 // Don't pause twice for Return/GoBack
                 if( choice != optReturn.Text ) Pause();
@@ -819,7 +830,7 @@ namespace TimeTracker
                 menuCategories.Add( optGoBack );
 
                 // Display the Categories Edit Menu.
-                choice = menuCategories.Run();
+                choice = menuCategories.Run().Text;
 
                 // Don't pause twice for Return/GoBack.
                 if( choice != optGoBack.Text ) Pause();
@@ -965,7 +976,7 @@ namespace TimeTracker
                 menuActivities.Add( optGoBack );
 
                 // Display the Categories Edit Menu.
-                choice = menuActivities.Run();
+                choice = menuActivities.Run().Text;
 
                 // Don't pause twice for Return/GoBack
                 if( choice != optGoBack.Text ) Pause();
@@ -1128,7 +1139,7 @@ namespace TimeTracker
                 menuLogDays.Add( optGoBack );
 
                 // Display the Categories Edit Menu.
-                choice = menuLogDays.Run();
+                choice = menuLogDays.Run().Text;
 
                 // Don't pause twice for Return/GoBack
                 if( choice != optGoBack.Text ) Pause();
@@ -1180,7 +1191,7 @@ namespace TimeTracker
                 menuLogEntries.Add( optGoBack );
 
                 // Display the Categories Edit Menu.
-                choice = menuLogEntries.Run();
+                choice = menuLogEntries.Run().Text;
 
                 // Don't pause twice for Return/GoBack
                 if( choice != optGoBack.Text ) Pause();
@@ -1269,7 +1280,7 @@ namespace TimeTracker
                 menuEntry.Prompt = text;
 
                 // Display the Profile Edit Menu.
-                choice = menuEntry.Run();
+                choice = menuEntry.Run().Text;
 
                 // Don't pause twice for Return/GoBack
                 if( choice != optGoBack.Text ) Pause();
@@ -1292,7 +1303,7 @@ namespace TimeTracker
                     day.ToString(), () => { } ) ) );
 
             // Get the user's new Numerical Day.
-            entry.DayID = int.Parse( dayMenu.Run() );
+            entry.DayID = int.Parse( dayMenu.Run().Text );
 
             // Clear the console for nicer output.
             Console.Clear();
@@ -1339,7 +1350,7 @@ namespace TimeTracker
                     date.ToString( "yyyy-MM-dd" ), () => { } ) ) );
 
             // Get the user's new Numerical Day.
-            entry.DateID = dates[ DateTime.Parse( dateMenu.Run() ) ];
+            entry.DateID = dates[ DateTime.Parse( dateMenu.Run().Text ) ];
 
             // Clear the console for nicer output.
             Console.Clear();
@@ -1386,7 +1397,7 @@ namespace TimeTracker
                     wd, () => { } ) ) );
 
             // Get the user's new Weekday.
-            entry.WeekdayID = weekdays[ weekdayMenu.Run() ];
+            entry.WeekdayID = weekdays[ weekdayMenu.Run().Text ];
 
             // Clear the console for nicer output.
             Console.Clear();
@@ -1433,7 +1444,7 @@ namespace TimeTracker
                     cat, () => { } ) ) );
 
             // Get the user's new Category.
-            entry.CategoryID = categories[ catMenu.Run() ];
+            entry.CategoryID = categories[ catMenu.Run().Text ];
 
             // Clear the console for nicer output.
             Console.Clear();
@@ -1480,7 +1491,7 @@ namespace TimeTracker
                     act, () => { } ) ) );
 
             // Get the user's new Activity.
-            entry.ActivityID = activities[ actMenu.Run() ];
+            entry.ActivityID = activities[ actMenu.Run().Text ];
 
             // Clear the console for nicer output.
             Console.Clear();
@@ -1527,7 +1538,7 @@ namespace TimeTracker
                     dur.ToString(), () => { } ) ) );
 
             // Get the user's new Duration.
-            entry.DurationID = durations[ double.Parse( durMenu.Run() ) ];
+            entry.DurationID = durations[ double.Parse( durMenu.Run().Text ) ];
 
             // Clear the console for nicer output.
             Console.Clear();
@@ -1606,6 +1617,125 @@ namespace TimeTracker
             {
                 // Let the user know the delete was canceled.
                 Console.WriteLine( "The delete was canceled.  Phew...  Close call!" );
+            }
+        }
+
+        // Lets the user view screen of calculations on data from the activity log.
+        private static void ViewCalc()
+        {
+            // Clear the Console for nicer output.
+            Console.Clear();
+
+            // Let the user know what's being shown.
+            Console.WriteLine( "Here are some interesting statistics about the activites you've logged:\n" );
+
+            using( var con = new MySqlConnection( cs ) )
+            {
+                con.Open();
+
+                // Query the database for interesting statistics.
+
+                using( var cmd = con.CreateCommand() )
+                {
+                    // Total time spent by category.
+                    cmd.CommandText = "select      AC.category_description     as category,   " +
+                                      "       sum( TS.time_spent_on_activity ) as duration    " +
+                                      "from activity_log        as AL                         " +
+                                      "join activity_categories as AC                         " +
+                                      "on AL.category_description   = AC.activity_category_id " +
+                                      "join activity_times      as TS                         " +
+                                      "on AL.time_spent_on_activity = TS.activity_time_id     " +
+                                      "where AL.user_id = @ID                                 " +
+                                      "group by AC.category_description                       ";
+
+                    // Parameterize to avoid SQL Injection Attacks.
+                    cmd.Parameters.AddWithValue( "@ID", loggedIn.ID );
+
+                    // Write the statistics group heading.
+                    Console.WriteLine( "Total Time Spent by Activity Category:\n");
+
+                    // Execute the query.
+                    using( MySqlDataReader rdr = cmd.ExecuteReader() )
+                    {
+                        // Get all time totals by category.
+                        while( rdr.Read() )
+                        {
+                            // Write these statistics to console.
+                            Console.WriteLine( " - {1:n2} hours on {0} activities",
+                               rdr[ "category" ].ToString(), double.Parse( rdr[ "duration" ].ToString() ) );
+                        }
+                    }
+                }
+
+                using( var cmd = con.CreateCommand() )
+                {
+                    // Average daily time spent by category.
+                    cmd.CommandText = "select category, avg( duration ) as average              " +
+                                      "from                                                     " +
+                                      "( select      AL.calendar_day             as `day`,      " +
+                                      "              AC.category_description     as category,   " +
+                                      "         sum( TS.time_spent_on_activity ) as duration    " +
+                                      "  from activity_log        as AL                         " +
+                                      "  join activity_categories as AC                         " +
+                                      "  on AL.category_description   = AC.activity_category_id " +
+                                      "  join activity_times      as TS                         " +
+                                      "  on AL.time_spent_on_activity = TS.activity_time_id     " +
+                                      "  where AL.user_id = @ID                                 " +
+                                      "  group by `day`, category ) as daily_totals             " +
+                                      "group by category                                        ";
+
+                    // Parameterize to avoid SQL Injection Attacks.
+                    cmd.Parameters.AddWithValue( "@ID", loggedIn.ID );
+
+                    // Write the statistics group heading.
+                    Console.WriteLine( "\nAverage Daily Time Spent by Activity Category:\n");
+
+                    // Execute the query.
+                    using( MySqlDataReader rdr = cmd.ExecuteReader() )
+                    {
+                        // Get all time totals by category.
+                        while( rdr.Read() )
+                        {
+                            // Write these statistics to console.
+                            Console.WriteLine( " - {1:n2} hours per day, on {0} activities",
+                               rdr[ "category" ].ToString(), double.Parse( rdr[ "average" ].ToString() ) );
+                        }
+                    }
+                }
+
+                using( var cmd = con.CreateCommand() )
+                {
+                    // Top 5 activities by total time spent.
+                    cmd.CommandText = "select      AD.activity_description     as activity,      " +
+                                      "       sum( TS.time_spent_on_activity ) as duration       " +
+                                      "from activity_log          as AL                          " +
+                                      "join activity_descriptions as AD                          " +
+                                      "on AL.activity_description   = AD.activity_description_id " +
+                                      "join activity_times        as TS                          " +
+                                      "on AL.time_spent_on_activity = TS.activity_time_id        " +
+                                      "where AL.user_id = 1                                      " +
+                                      "group by activity                                         " +
+                                      "order by duration desc                                    " +
+                                      "limit 5                                                   ";
+
+                    // Parameterize to avoid SQL Injection Attacks.
+                    cmd.Parameters.AddWithValue( "@ID", loggedIn.ID );
+
+                    // Write the statistics group heading.
+                    Console.WriteLine( "\nTop 5 Activities by Total Time Spent:\n");
+
+                    // Execute the query.
+                    using( MySqlDataReader rdr = cmd.ExecuteReader() )
+                    {
+                        // Get all time totals by category.
+                        while( rdr.Read() )
+                        {
+                            // Write these statistics to console.
+                            Console.WriteLine( " - {1:n2} hours total spent on {0}",
+                               rdr[ "activity" ].ToString(), double.Parse( rdr[ "duration" ].ToString() ) );
+                        }
+                    }
+                }
             }
         }
 
